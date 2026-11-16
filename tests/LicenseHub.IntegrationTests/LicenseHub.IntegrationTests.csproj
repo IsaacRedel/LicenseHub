@@ -1,13 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Needs Docker: each run starts a MariaDB 11.4 container with Testcontainers. -->
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
-    <!-- No tests yet: exit code 8 means "zero tests ran". Remove once the first test lands. -->
-    <TestingPlatformCommandLineArguments>--ignore-exit-code 8</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.MariaDb" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
 
@@ -16,8 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\LicenseHub.Domain\LicenseHub.Domain.csproj" />
-    <ProjectReference Include="..\..\src\LicenseHub.Application\LicenseHub.Application.csproj" />
+    <ProjectReference Include="..\..\src\LicenseHub.Api\LicenseHub.Api.csproj" />
     <ProjectReference Include="..\..\src\LicenseHub.Infrastructure\LicenseHub.Infrastructure.csproj" />
   </ItemGroup>
 
