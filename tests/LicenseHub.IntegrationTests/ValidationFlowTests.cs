@@ -89,7 +89,31 @@ public sealed class ValidationFlowTests(MariaDbFixture database) : ApiTestBase(d
         using var problem = JsonDocument.Parse(await staleResponse.Content.ReadAsStringAsync(Token));
         Assert.Equal("request.timestamp_out_of_window", problem.RootElement.GetProperty("code").GetString());
         Assert.Equal(HttpStatusCode.BadRequest, malformed.StatusCode);
+        Assert.Equal("request.malformed_body", await ReadProblemCodeAsync(malformed));
         Assert.Equal(0, await QueryAsync(db => db.ValidationLogs.CountAsync(l => l.LicenseId == license.Id, Token)));
+    }
+
+    [Theory]
+    [InlineData("{\"key\":")]
+    [InlineData("{\"timestamp\":\"abc\"}")]
+    [InlineData("{\"timestamp\":1.5}")]
+    [InlineData("{\"key\":123}")]
+    [InlineData("")]
+    public async Task Validate_ReturnsMalformedBodyCodeForUnreadableBodies(string body)
+    {
+        var response = await Client.PostAsync(
+            "/v1/licenses/validate",
+            new StringContent(body, Encoding.UTF8, "application/json"),
+            Token);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("request.malformed_body", await ReadProblemCodeAsync(response));
+    }
+
+    private static async Task<string?> ReadProblemCodeAsync(HttpResponseMessage response)
+    {
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Token));
+        return problem.RootElement.TryGetProperty("code", out var code) ? code.GetString() : null;
     }
 
     [Fact]

@@ -19,7 +19,16 @@ if (args is [KeygenCommand.Name, ..])
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+{
+    // Use-case errors already carry a code; a 400 without one comes from a body the binder could not read.
+    if (context.ProblemDetails.Status == StatusCodes.Status400BadRequest
+        && !context.ProblemDetails.Extensions.ContainsKey("code"))
+    {
+        context.ProblemDetails.Extensions["code"] = "request.malformed_body";
+        context.ProblemDetails.Detail ??= "The request body is missing, is not valid JSON or has fields of the wrong type.";
+    }
+});
 builder.Services.AddOpenApi();
 
 // Development defaults to throwing on unreadable bodies, which the exception handler would turn into a 500.
