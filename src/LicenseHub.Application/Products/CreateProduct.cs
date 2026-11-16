@@ -27,7 +27,7 @@ public sealed class CreateProductHandler(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
-    public static readonly Error SlugTaken = new("product.slug_taken", "A product with this slug already exists.");
+    public static readonly Error SlugTaken = new("product.slug_taken", "A product with this slug already exists.", ErrorKind.Conflict);
 
     public async Task<Result<ProductResponse>> HandleAsync(CreateProductCommand command, CancellationToken cancellationToken)
     {

@@ -36,7 +36,7 @@ public sealed class IssueLicenseHandler(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
-    public static readonly Error ProductNotFound = new("license.product_not_found", "The product does not exist.");
+    public static readonly Error ProductNotFound = new("license.product_not_found", "The product does not exist.", ErrorKind.NotFound);
 
     public async Task<Result<IssuedLicense>> HandleAsync(IssueLicenseCommand command, CancellationToken cancellationToken)
     {

@@ -30,6 +30,8 @@ public static class DependencyInjection
 
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ILicenseRepository, LicenseRepository>();
+        services.AddScoped<IActivationRepository, ActivationRepository>();
+        services.AddScoped<IValidationLogRepository, ValidationLogRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         return services;

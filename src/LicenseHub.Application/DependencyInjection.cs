@@ -12,6 +12,8 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<IssueLicenseHandler>();
+        services.AddScoped<ValidateLicenseHandler>();
+        services.AddScoped<DeactivateLicenseHandler>();
         return services;
     }
 }
