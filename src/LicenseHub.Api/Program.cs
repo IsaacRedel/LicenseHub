@@ -28,6 +28,14 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
         context.ProblemDetails.Extensions["code"] = "request.malformed_body";
         context.ProblemDetails.Detail ??= "The request body is missing, is not valid JSON or has fields of the wrong type.";
     }
+
+    // Bearer challenges (no token, expired, wrong signature) leave an empty 401.
+    if (context.ProblemDetails.Status == StatusCodes.Status401Unauthorized
+        && !context.ProblemDetails.Extensions.ContainsKey("code"))
+    {
+        context.ProblemDetails.Extensions["code"] = "auth.unauthorized";
+        context.ProblemDetails.Detail ??= "A valid admin bearer token is required.";
+    }
 });
 builder.Services.AddOpenApi();
 
@@ -37,6 +45,7 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddResponseSigning(builder.Configuration, allowEphemeralKey: builder.Environment.IsDevelopment());
 var adminJwt = builder.Services.AddAdminTokens(builder.Configuration, allowEphemeralKey: builder.Environment.IsDevelopment());
+builder.Services.AddAdminAuthentication(adminJwt);
 builder.Services.AddLicenseHubRateLimiting(builder.Configuration);
 var useForwardedHeaders = builder.Services.AddTrustedForwardedHeaders(builder.Configuration);
 builder.Services.AddHealthChecks().AddDbContextCheck<LicenseHubDbContext>(DatabaseHealthCheck);
@@ -90,6 +99,8 @@ if (useForwardedHeaders)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // API reference only in Development: /openapi/v1.json and the Scalar UI at /scalar.
 if (app.Environment.IsDevelopment())
@@ -100,6 +111,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapHealthChecks("/health");
 app.MapLicenseEndpoints();
+app.MapAdminEndpoints();
 
 await app.RunAsync();
 return 0;

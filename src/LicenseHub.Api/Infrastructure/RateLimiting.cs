@@ -21,6 +21,9 @@ public sealed class RateLimitingSettings
     /// <summary>Validate and deactivate: strict, to slow down key guessing.</summary>
     public RateLimitRule Licenses { get; set; } = new() { PermitLimit = 20 };
 
+    /// <summary>POST /admin/auth/login: the strictest, on top of the per-account lockout.</summary>
+    public RateLimitRule Login { get; set; } = new() { PermitLimit = 5 };
+
     /// <summary>Every other endpoint except /health.</summary>
     public RateLimitRule Default { get; set; } = new() { PermitLimit = 100 };
 }
@@ -30,12 +33,16 @@ public static class RateLimiting
     /// <summary>Policy for POST /v1/licenses/validate and /deactivate.</summary>
     public const string LicensesPolicy = "licenses";
 
+    /// <summary>Policy for POST /admin/auth/login.</summary>
+    public const string LoginPolicy = "login";
+
     private const int LicensesSegments = 6;
 
     public static IServiceCollection AddLicenseHubRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         var settings = configuration.GetSection(RateLimitingSettings.SectionName).Get<RateLimitingSettings>() ?? new RateLimitingSettings();
         Validate(settings.Licenses, nameof(settings.Licenses));
+        Validate(settings.Login, nameof(settings.Login));
         Validate(settings.Default, nameof(settings.Default));
 
         services.AddRateLimiter(options =>
@@ -61,6 +68,14 @@ public static class RateLimiting
                     PermitLimit = settings.Licenses.PermitLimit,
                     Window = TimeSpan.FromSeconds(settings.Licenses.WindowSeconds),
                     SegmentsPerWindow = LicensesSegments,
+                    QueueLimit = 0,
+                }));
+
+            options.AddPolicy(LoginPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(ClientKey(context), _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = settings.Login.PermitLimit,
+                    Window = TimeSpan.FromSeconds(settings.Login.WindowSeconds),
                     QueueLimit = 0,
                 }));
         });
