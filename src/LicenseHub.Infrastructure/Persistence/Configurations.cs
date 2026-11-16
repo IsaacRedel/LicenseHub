@@ -60,12 +60,12 @@ internal sealed class ActivationConfiguration : IEntityTypeConfiguration<Activat
         builder.ToTable("activations");
         builder.HasKey(a => a.Id);
         builder.Property(a => a.Id).ValueGeneratedNever();
-        builder.Property(a => a.ServerIdentifier)
-            .HasMaxLength(Limits.ServerIdentifierLength)
+        builder.Property(a => a.InstanceId)
+            .HasMaxLength(Limits.InstanceIdLength)
             .UseCollation(BinaryCollation.Name)
             .IsRequired();
 
-        builder.HasIndex(a => new { a.LicenseId, a.ServerIdentifier }).IsUnique();
+        builder.HasIndex(a => new { a.LicenseId, a.InstanceId }).IsUnique();
 
         builder.HasOne<License>()
             .WithMany()

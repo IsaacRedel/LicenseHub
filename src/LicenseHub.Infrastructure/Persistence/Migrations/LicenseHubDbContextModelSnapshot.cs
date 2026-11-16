@@ -30,21 +30,21 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("FirstValidatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("InstanceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)")
+                        .UseCollation("utf8mb4_bin");
+
                     b.Property<DateTimeOffset>("LastValidatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<Guid>("LicenseId")
                         .HasColumnType("char(36)");
 
-                    b.Property<string>("ServerIdentifier")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("varchar(128)")
-                        .UseCollation("utf8mb4_bin");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("LicenseId", "ServerIdentifier")
+                    b.HasIndex("LicenseId", "InstanceId")
                         .IsUnique();
 
                     b.ToTable("activations", (string)null);

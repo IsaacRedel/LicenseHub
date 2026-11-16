@@ -2,7 +2,7 @@ using LicenseHub.Domain.Common;
 
 namespace LicenseHub.Domain.Licenses;
 
-/// <summary>A server that has used a license. Activation rules are implemented in stage 2.</summary>
+/// <summary>A client instance (e.g. a game server) that has used a license.</summary>
 public sealed class Activation
 {
     private Activation()
@@ -13,21 +13,21 @@ public sealed class Activation
 
     public Guid LicenseId { get; private set; }
 
-    public string ServerIdentifier { get; private set; } = null!;
+    public string InstanceId { get; private set; } = null!;
 
     public DateTimeOffset FirstValidatedAt { get; private set; }
 
     public DateTimeOffset LastValidatedAt { get; private set; }
 
-    public static Activation Create(Guid licenseId, string serverIdentifier, DateTimeOffset now) => new()
+    public static Activation Create(Guid licenseId, string instanceId, DateTimeOffset now) => new()
     {
         Id = Guid.CreateVersion7(now),
         LicenseId = Guard.RequiredId(licenseId, "activation.invalid_license", "License"),
-        ServerIdentifier = Guard.RequiredText(
-            serverIdentifier,
-            Limits.ServerIdentifierLength,
-            "activation.invalid_server_identifier",
-            "Server identifier"),
+        InstanceId = Guard.RequiredText(
+            instanceId,
+            Limits.InstanceIdLength,
+            "activation.invalid_instance_id",
+            "Instance id"),
         FirstValidatedAt = now.ToUniversalTime(),
         LastValidatedAt = now.ToUniversalTime(),
     };
