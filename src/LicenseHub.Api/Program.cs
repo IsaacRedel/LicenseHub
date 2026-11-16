@@ -1,3 +1,4 @@
+using LicenseHub.Api.Commands;
 using LicenseHub.Api.Endpoints;
 using LicenseHub.Api.Infrastructure;
 using LicenseHub.Application;
@@ -9,6 +10,12 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 
 const string DatabaseHealthCheck = "database";
+
+// `keygen` needs neither configuration nor a database.
+if (args is [KeygenCommand.Name, ..])
+{
+    return KeygenCommand.Run(Console.Out);
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +43,11 @@ builder.Services.PostConfigure<HealthCheckServiceOptions>(options =>
 
 var app = builder.Build();
 
+if (args is [SeedCommand.Name, ..])
+{
+    return await SeedCommand.RunAsync(app, Console.Out, Console.Error);
+}
+
 if (app.Services.GetRequiredService<ResponseSigningKey>().IsEphemeral)
 {
     app.Logger.LogWarning(
@@ -46,8 +58,10 @@ if (app.Services.GetRequiredService<ResponseSigningKey>().IsEphemeral)
 // Off by default; docker-compose.yml turns it on so `docker compose up` gives a ready database.
 if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    await scope.ServiceProvider.GetRequiredService<LicenseHubDbContext>().Database.MigrateAsync();
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        await scope.ServiceProvider.GetRequiredService<LicenseHubDbContext>().Database.MigrateAsync();
+    }
 }
 
 // First, so the client IP seen by rate limiting and logs is the real one.
@@ -71,3 +85,4 @@ app.MapHealthChecks("/health");
 app.MapLicenseEndpoints();
 
 await app.RunAsync();
+return 0;
