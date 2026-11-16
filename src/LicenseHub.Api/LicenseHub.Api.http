@@ -2,11 +2,17 @@
 ### 1. Start the stack: docker compose up -d --build
 ### 2. Create a demo license: docker compose run --rm api seed
 ### 3. Paste the printed key below.
+### Admin section: create an admin first with
+###   docker compose run --rm api admin create --email you@example.com
+### then set the email and password below and send the login request.
 
 @baseUrl = http://localhost:8080
 @key = LH-XXXX-XXXX-XXXX-XXXX
 @productSlug = demo
 @instanceId = local-server-01
+@adminEmail = you@example.com
+@adminPassword = your-admin-password
+@token = {{login.response.body.$.accessToken}}
 
 ### Health
 GET {{baseUrl}}/health
@@ -74,3 +80,80 @@ Content-Type: application/json
 
 ### OpenAPI document (Development only); the interactive UI is at {{baseUrl}}/scalar
 GET {{baseUrl}}/openapi/v1.json
+
+################################ Admin ################################
+
+### Login: the requests below reuse its token (valid for 30 minutes)
+# @name login
+POST {{baseUrl}}/admin/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Without a token: 401
+GET {{baseUrl}}/admin/products
+
+### Products
+GET {{baseUrl}}/admin/products
+Authorization: Bearer {{token}}
+
+### Create a product
+# @name createProduct
+POST {{baseUrl}}/admin/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "FiveM Garage",
+  "slug": "fivem-garage",
+  "defaultMaxActivations": 2
+}
+
+### Change the name or default activation limit (the slug is immutable)
+PATCH {{baseUrl}}/admin/products/{{createProduct.response.body.$.id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "defaultMaxActivations": 3
+}
+
+### Issue a license: the key appears only in this response
+# @name issueLicense
+POST {{baseUrl}}/admin/licenses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": "{{createProduct.response.body.$.id}}",
+  "customerEmail": "buyer@example.com",
+  "expiresAt": "2027-12-31T23:59:59Z"
+}
+
+### List licenses (status: active | revoked | expired; pageSize at most 100)
+GET {{baseUrl}}/admin/licenses?status=active&productSlug=fivem-garage&page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### License details with activations (never the key)
+GET {{baseUrl}}/admin/licenses/{{issueLicense.response.body.$.id}}
+Authorization: Bearer {{token}}
+
+### Revoke (idempotent: repeating keeps the first date, reason and admin)
+POST {{baseUrl}}/admin/licenses/{{issueLicense.response.body.$.id}}/revoke
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reason": "Chargeback"
+}
+
+### Free an activation slot
+DELETE {{baseUrl}}/admin/licenses/{{issueLicense.response.body.$.id}}/activations/{{instanceId}}
+Authorization: Bearer {{token}}
+
+### Stats: licenses by status, validations per day (30 days), top products
+GET {{baseUrl}}/admin/stats
+Authorization: Bearer {{token}}

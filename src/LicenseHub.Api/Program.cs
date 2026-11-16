@@ -50,7 +50,7 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
         context.ProblemDetails.Detail ??= "A valid admin bearer token is required.";
     }
 });
-builder.Services.AddOpenApi();
+builder.Services.AddLicenseHubOpenApi();
 
 // Enums as camelCase strings ("active", "revoked") in admin responses.
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -128,7 +128,7 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapScalarApiReference(options => options.AddPreferredSecuritySchemes(OpenApiSetup.BearerScheme));
 }
 
 app.MapHealthChecks("/health");
