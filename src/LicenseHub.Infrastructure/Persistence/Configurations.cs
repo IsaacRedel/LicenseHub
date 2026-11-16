@@ -8,6 +8,15 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace LicenseHub.Infrastructure.Persistence;
 
+/// <summary>
+/// Opaque identifiers sent by clients or gateways compare byte for byte, like C# ordinal equality.
+/// The default utf8mb4 collation is case- and accent-insensitive, which would merge distinct values.
+/// </summary>
+internal static class BinaryCollation
+{
+    public const string Name = "utf8mb4_bin";
+}
+
 internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
     public void Configure(EntityTypeBuilder<Product> builder)
@@ -51,7 +60,10 @@ internal sealed class ActivationConfiguration : IEntityTypeConfiguration<Activat
         builder.ToTable("activations");
         builder.HasKey(a => a.Id);
         builder.Property(a => a.Id).ValueGeneratedNever();
-        builder.Property(a => a.ServerIdentifier).HasMaxLength(Limits.ServerIdentifierLength).IsRequired();
+        builder.Property(a => a.ServerIdentifier)
+            .HasMaxLength(Limits.ServerIdentifierLength)
+            .UseCollation(BinaryCollation.Name)
+            .IsRequired();
 
         builder.HasIndex(a => new { a.LicenseId, a.ServerIdentifier }).IsUnique();
 
@@ -90,7 +102,10 @@ internal sealed class PaymentEventConfiguration : IEntityTypeConfiguration<Payme
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
         builder.Property(p => p.Gateway).HasMaxLength(Limits.GatewayLength).IsRequired();
-        builder.Property(p => p.ExternalEventId).HasMaxLength(Limits.ExternalEventIdLength).IsRequired();
+        builder.Property(p => p.ExternalEventId)
+            .HasMaxLength(Limits.ExternalEventIdLength)
+            .UseCollation(BinaryCollation.Name)
+            .IsRequired();
 
         builder.HasIndex(p => new { p.Gateway, p.ExternalEventId }).IsUnique();
 

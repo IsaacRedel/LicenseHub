@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LicenseHub.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(LicenseHubDbContext))]
-    [Migration("20261116111246_InitialCreate")]
+    [Migration("20261116112633_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -42,7 +42,8 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     b.Property<string>("ServerIdentifier")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("varchar(128)")
+                        .UseCollation("utf8mb4_bin");
 
                     b.HasKey("Id");
 
@@ -106,7 +107,8 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     b.Property<string>("ExternalEventId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("varchar(128)")
+                        .UseCollation("utf8mb4_bin");
 
                     b.Property<string>("Gateway")
                         .IsRequired()

@@ -39,7 +39,8 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     b.Property<string>("ServerIdentifier")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("varchar(128)")
+                        .UseCollation("utf8mb4_bin");
 
                     b.HasKey("Id");
 
@@ -103,7 +104,8 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     b.Property<string>("ExternalEventId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("varchar(128)")
+                        .UseCollation("utf8mb4_bin");
 
                     b.Property<string>("Gateway")
                         .IsRequired()

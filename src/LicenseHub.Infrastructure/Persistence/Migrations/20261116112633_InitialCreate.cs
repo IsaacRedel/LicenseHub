@@ -66,7 +66,7 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                 {
                     Id = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     LicenseId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
-                    ServerIdentifier = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false)
+                    ServerIdentifier = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     FirstValidatedAt = table.Column<DateTimeOffset>(type: "datetime(6)", nullable: false),
                     LastValidatedAt = table.Column<DateTimeOffset>(type: "datetime(6)", nullable: false)
@@ -90,7 +90,7 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     Id = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     Gateway = table.Column<string>(type: "varchar(32)", maxLength: 32, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ExternalEventId = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false)
+                    ExternalEventId = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     ReceivedAt = table.Column<DateTimeOffset>(type: "datetime(6)", nullable: false),
                     LicenseId = table.Column<Guid>(type: "char(36)", nullable: true, collation: "ascii_general_ci")
