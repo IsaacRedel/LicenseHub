@@ -195,7 +195,7 @@ var fingerprint = Base64Url.EncodeToString(SHA256.HashData(Encoding.UTF8.GetByte
 ### Proteções
 
 - **Rate limit:**
-  - por IP, com 20 chamadas por minuto em `validate`/`deactivate` e 100 por minuto nas demais rotas (configurável em `RateLimiting`);
+  - por IP (IPv6 agrupado pelo prefixo /64), com 20 chamadas por minuto em `validate`/`deactivate` e 100 por minuto nas demais rotas (configurável em `RateLimiting`);
   - atrás de um proxy reverso, liste o proxy em `ForwardedHeaders:KnownProxies` ou `KnownNetworks`. Sem essa configuração, o `X-Forwarded-For` é ignorado.
 - **Concorrência:**
   - a ativação acontece numa transação que trava a linha da licença (`SELECT … FOR UPDATE`);

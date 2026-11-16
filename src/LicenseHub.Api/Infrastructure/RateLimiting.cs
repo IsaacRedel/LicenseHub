@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -66,8 +68,33 @@ public static class RateLimiting
         return services;
     }
 
-    private static string ClientKey(HttpContext context) =>
-        context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    private static string ClientKey(HttpContext context) => PartitionKey(context.Connection.RemoteIpAddress);
+
+    /// <summary>
+    /// The rate limit partition for an address. IPv6 clients usually control a whole /64, so they are grouped
+    /// by that prefix; otherwise each address in it would get its own budget. IPv4-mapped IPv6 counts as IPv4.
+    /// </summary>
+    public static string PartitionKey(IPAddress? address)
+    {
+        if (address is null)
+        {
+            return "unknown";
+        }
+
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (address.AddressFamily != AddressFamily.InterNetworkV6)
+        {
+            return address.ToString();
+        }
+
+        var bytes = address.GetAddressBytes();
+        Array.Clear(bytes, 8, 8);
+        return $"{new IPAddress(bytes)}/64";
+    }
 
     private static async ValueTask WriteRejectionAsync(
         OnRejectedContext context,
