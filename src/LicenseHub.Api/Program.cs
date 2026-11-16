@@ -1,4 +1,5 @@
 using LicenseHub.Api.Endpoints;
+using LicenseHub.Api.Infrastructure;
 using LicenseHub.Application;
 using LicenseHub.Infrastructure;
 using LicenseHub.Infrastructure.Persistence;
@@ -17,6 +18,8 @@ builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadReq
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddResponseSigning(builder.Configuration, allowEphemeralKey: builder.Environment.IsDevelopment());
+builder.Services.AddLicenseHubRateLimiting(builder.Configuration);
+var useForwardedHeaders = builder.Services.AddTrustedForwardedHeaders(builder.Configuration);
 builder.Services.AddHealthChecks().AddDbContextCheck<LicenseHubDbContext>(DatabaseHealthCheck);
 
 // CanConnectAsync goes through the retry strategy, so a down database would hang /health for
@@ -45,8 +48,15 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
     await scope.ServiceProvider.GetRequiredService<LicenseHubDbContext>().Database.MigrateAsync();
 }
 
+// First, so the client IP seen by rate limiting and logs is the real one.
+if (useForwardedHeaders)
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
 app.MapLicenseEndpoints();

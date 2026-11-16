@@ -1,0 +1,113 @@
+using System.Globalization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+
+namespace LicenseHub.Api.Infrastructure;
+
+public sealed class RateLimitRule
+{
+    public int PermitLimit { get; set; }
+
+    public int WindowSeconds { get; set; } = 60;
+}
+
+/// <summary>Bound from the "RateLimiting" configuration section.</summary>
+public sealed class RateLimitingSettings
+{
+    public const string SectionName = "RateLimiting";
+
+    /// <summary>Validate and deactivate: strict, to slow down key guessing.</summary>
+    public RateLimitRule Licenses { get; set; } = new() { PermitLimit = 20 };
+
+    /// <summary>Every other endpoint except /health.</summary>
+    public RateLimitRule Default { get; set; } = new() { PermitLimit = 100 };
+}
+
+public static class RateLimiting
+{
+    /// <summary>Policy for POST /v1/licenses/validate and /deactivate.</summary>
+    public const string LicensesPolicy = "licenses";
+
+    private const int LicensesSegments = 6;
+
+    public static IServiceCollection AddLicenseHubRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    {
+        var settings = configuration.GetSection(RateLimitingSettings.SectionName).Get<RateLimitingSettings>() ?? new RateLimitingSettings();
+        Validate(settings.Licenses, nameof(settings.Licenses));
+        Validate(settings.Default, nameof(settings.Default));
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = (context, cancellationToken) => WriteRejectionAsync(context, settings, cancellationToken);
+
+            // Partitioned by client IP. Behind a reverse proxy this is only the real client when the proxy is
+            // listed in ForwardedHeaders; otherwise every caller shares the proxy's address.
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                context.Request.Path.StartsWithSegments("/health")
+                    ? RateLimitPartition.GetNoLimiter("health")
+                    : RateLimitPartition.GetFixedWindowLimiter(ClientKey(context), _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = settings.Default.PermitLimit,
+                        Window = TimeSpan.FromSeconds(settings.Default.WindowSeconds),
+                        QueueLimit = 0,
+                    }));
+
+            options.AddPolicy(LicensesPolicy, context =>
+                RateLimitPartition.GetSlidingWindowLimiter(ClientKey(context), _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = settings.Licenses.PermitLimit,
+                    Window = TimeSpan.FromSeconds(settings.Licenses.WindowSeconds),
+                    SegmentsPerWindow = LicensesSegments,
+                    QueueLimit = 0,
+                }));
+        });
+
+        return services;
+    }
+
+    private static string ClientKey(HttpContext context) =>
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    private static async ValueTask WriteRejectionAsync(
+        OnRejectedContext context,
+        RateLimitingSettings settings,
+        CancellationToken cancellationToken)
+    {
+        // Fixed windows report when the window resets; sliding windows do not, so fall back to one segment.
+        var retryAfterSeconds = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+            ? retryAfter.TotalSeconds
+            : IsLicensesEndpoint(context.HttpContext)
+                ? (double)settings.Licenses.WindowSeconds / LicensesSegments
+                : settings.Default.WindowSeconds;
+
+        context.HttpContext.Response.Headers.RetryAfter =
+            Math.Max(1, (int)Math.Ceiling(retryAfterSeconds)).ToString(CultureInfo.InvariantCulture);
+
+        var problemDetails = context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>();
+        await problemDetails.WriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = context.HttpContext,
+            ProblemDetails =
+            {
+                Type = "https://tools.ietf.org/html/rfc6585#section-4",
+                Status = StatusCodes.Status429TooManyRequests,
+                Title = "Too many requests",
+                Detail = "Rate limit exceeded. Retry after the number of seconds in the Retry-After header.",
+                Extensions = { ["code"] = "rate_limited" },
+            },
+        });
+    }
+
+    private static bool IsLicensesEndpoint(HttpContext context) =>
+        context.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName == LicensesPolicy;
+
+    private static void Validate(RateLimitRule rule, string name)
+    {
+        if (rule.PermitLimit < 1 || rule.WindowSeconds < 1)
+        {
+            throw new InvalidOperationException(
+                $"RateLimiting:{name} needs PermitLimit and WindowSeconds greater than zero.");
+        }
+    }
+}

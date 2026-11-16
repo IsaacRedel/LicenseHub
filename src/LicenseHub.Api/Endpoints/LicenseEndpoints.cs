@@ -1,4 +1,5 @@
 using System.Net;
+using LicenseHub.Api.Infrastructure;
 using LicenseHub.Application.Licenses;
 using LicenseHub.Infrastructure.Signing;
 
@@ -30,19 +31,24 @@ public static class LicenseEndpoints
                 "and a reason, signed like a successful validation. The payload is base64url JSON; verify the " +
                 "ES256 signature (IEEE P1363) over the decoded bytes with the key from GET /v1/signing-key.")
             .Produces<SignedResponse>()
-            .ProducesValidationProblem();
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .RequireRateLimiting(RateLimiting.LicensesPolicy);
 
         v1.MapPost("/licenses/deactivate", DeactivateAsync)
             .WithName("DeactivateLicense")
             .WithSummary("Frees the activation of an instance so another one can use the license.")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem()
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .RequireRateLimiting(RateLimiting.LicensesPolicy);
 
         v1.MapGet("/signing-key", GetSigningKey)
             .WithName("GetSigningKey")
             .WithSummary("Returns the public key that verifies validation responses.")
-            .Produces<SigningKeyResponse>();
+            .Produces<SigningKeyResponse>()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         return app;
     }
