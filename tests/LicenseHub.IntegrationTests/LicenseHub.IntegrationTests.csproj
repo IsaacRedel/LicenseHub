@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- No tests yet: exit code 8 means "zero tests ran". Remove once the first test lands. -->
+    <TestingPlatformCommandLineArguments>--ignore-exit-code 8</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LicenseHub.Domain\LicenseHub.Domain.csproj" />
+    <ProjectReference Include="..\..\src\LicenseHub.Application\LicenseHub.Application.csproj" />
+    <ProjectReference Include="..\..\src\LicenseHub.Infrastructure\LicenseHub.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
