@@ -6,10 +6,18 @@
     <!-- Pins EF Core for every consumer; the provider accepts [10.0.14, 10.0.999]. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <!-- Only PasswordHasher<T>; none of the Identity stores, cookies or UI. -->
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\LicenseHub.Application\LicenseHub.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LicenseHub.UnitTests" />
+    <InternalsVisibleTo Include="LicenseHub.IntegrationTests" />
   </ItemGroup>
 
 </Project>

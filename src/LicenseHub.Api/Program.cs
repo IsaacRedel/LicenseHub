@@ -36,6 +36,7 @@ builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadReq
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddResponseSigning(builder.Configuration, allowEphemeralKey: builder.Environment.IsDevelopment());
+var adminJwt = builder.Services.AddAdminTokens(builder.Configuration, allowEphemeralKey: builder.Environment.IsDevelopment());
 builder.Services.AddLicenseHubRateLimiting(builder.Configuration);
 var useForwardedHeaders = builder.Services.AddTrustedForwardedHeaders(builder.Configuration);
 builder.Services.AddHealthChecks().AddDbContextCheck<LicenseHubDbContext>(DatabaseHealthCheck);
@@ -61,6 +62,13 @@ if (app.Services.GetRequiredService<ResponseSigningKey>().IsEphemeral)
 {
     app.Logger.LogWarning(
         "Signing:PrivateKey is not configured; using an ephemeral signing key (keyId changes on every restart). " +
+        "Run the 'keygen' command to create a persistent key.");
+}
+
+if (adminJwt.IsEphemeral)
+{
+    app.Logger.LogWarning(
+        "AdminAuth:JwtKey is not configured; using an ephemeral key, so admin tokens stop working on restart. " +
         "Run the 'keygen' command to create a persistent key.");
 }
 

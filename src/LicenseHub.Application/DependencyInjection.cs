@@ -1,3 +1,4 @@
+using LicenseHub.Application.Admins;
 using LicenseHub.Application.Licenses;
 using LicenseHub.Application.Products;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<IssueLicenseHandler>();
         services.AddScoped<ValidateLicenseHandler>();
         services.AddScoped<DeactivateLicenseHandler>();
+        services.AddScoped<LoginHandler>();
         return services;
     }
 }

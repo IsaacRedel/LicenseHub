@@ -1,9 +1,11 @@
 using System.Buffers.Text;
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using LicenseHub.Api.Endpoints;
 using LicenseHub.Application.Licenses;
 using LicenseHub.Application.Products;
+using LicenseHub.Infrastructure.Auth;
 using LicenseHub.Infrastructure.Persistence;
 using LicenseHub.Infrastructure.Signing;
 using Microsoft.EntityFrameworkCore;
@@ -19,13 +21,32 @@ public abstract class ApiTestBase(MariaDbFixture database, int licensesPermitLim
 
     protected HttpClient Client { get; private set; } = null!;
 
+    /// <summary>The admin JWT key the API under test uses.</summary>
+    protected string AdminJwtKey { get; } = AdminJwtSettings.GenerateKey();
+
     protected static CancellationToken Token => TestContext.Current.CancellationToken;
 
     public async ValueTask InitializeAsync()
     {
-        var connectionString = await database.CreateDatabaseAsync();
-        Factory = new LicenseHubApiFactory(connectionString, _signingKey.ExportPrivateKeyBase64(), licensesPermitLimit);
+        var settings = new Dictionary<string, string>
+        {
+            ["ConnectionStrings:LicenseHub"] = await database.CreateDatabaseAsync(),
+            ["Signing:PrivateKey"] = _signingKey.ExportPrivateKeyBase64(),
+            ["AdminAuth:JwtKey"] = AdminJwtKey,
+            ["Database:ApplyMigrationsOnStartup"] = "true",
+            ["RateLimiting:Licenses:PermitLimit"] = licensesPermitLimit.ToString(CultureInfo.InvariantCulture),
+            ["RateLimiting:Login:PermitLimit"] = "100000",
+            ["RateLimiting:Default:PermitLimit"] = "100000",
+        };
+        ConfigureSettings(settings);
+
+        Factory = new LicenseHubApiFactory(settings);
         Client = Factory.CreateClient();
+    }
+
+    /// <summary>Lets a test class override API settings before the factory starts.</summary>
+    protected virtual void ConfigureSettings(Dictionary<string, string> settings)
+    {
     }
 
     public async ValueTask DisposeAsync()

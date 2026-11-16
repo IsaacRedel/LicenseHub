@@ -1,4 +1,5 @@
 using LicenseHub.Application.Abstractions;
+using LicenseHub.Domain.Admins;
 using LicenseHub.Domain.Licenses;
 using LicenseHub.Domain.Products;
 using LicenseHub.Domain.Validation;
@@ -11,10 +12,15 @@ internal sealed class FakeStore :
     ILicenseRepository,
     IActivationRepository,
     IValidationLogRepository,
+    IAdminUserRepository,
     IUnitOfWork
 {
     private readonly List<Action> _pending = [];
     private bool _inTransaction;
+
+    public List<AdminUser> Admins { get; } = [];
+
+    public int AdminLockCount { get; private set; }
 
     public List<Product> Products { get; } = [];
 
@@ -35,6 +41,25 @@ internal sealed class FakeStore :
 
     public Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(Products.SingleOrDefault(p => p.Id == id));
+
+    Task<AdminUser?> IAdminUserRepository.FindByEmailAsync(string email, CancellationToken cancellationToken) =>
+        Task.FromResult(Admins.SingleOrDefault(a => a.Email == email));
+
+    Task<AdminUser?> IAdminUserRepository.GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Admins.SingleOrDefault(a => a.Id == id));
+
+    Task<AdminUser?> IAdminUserRepository.GetForUpdateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_inTransaction)
+        {
+            throw new InvalidOperationException("GetForUpdateAsync must run inside a transaction.");
+        }
+
+        AdminLockCount++;
+        return Task.FromResult(Admins.SingleOrDefault(a => a.Id == id));
+    }
+
+    void IAdminUserRepository.Add(AdminUser admin) => _pending.Add(() => Admins.Add(admin));
 
     public Task<Product?> GetBySlugAsync(string slug, CancellationToken cancellationToken) =>
         Task.FromResult(Products.SingleOrDefault(p => p.Slug == slug));

@@ -23,6 +23,10 @@ internal static class ErrorResults
                 detail: error.Message,
                 statusCode: StatusCodes.Status409Conflict,
                 extensions: extensions),
+            ErrorKind.Unauthorized => TypedResults.Problem(
+                detail: error.Message,
+                statusCode: StatusCodes.Status401Unauthorized,
+                extensions: extensions),
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Kind, "Unknown error kind."),
         };
     }

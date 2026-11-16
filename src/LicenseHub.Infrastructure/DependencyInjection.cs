@@ -1,4 +1,5 @@
 using LicenseHub.Application.Abstractions;
+using LicenseHub.Infrastructure.Auth;
 using LicenseHub.Infrastructure.Persistence;
 using LicenseHub.Infrastructure.Signing;
 using Microsoft.EntityFrameworkCore;
@@ -33,9 +34,26 @@ public static class DependencyInjection
         services.AddScoped<ILicenseRepository, LicenseRepository>();
         services.AddScoped<IActivationRepository, ActivationRepository>();
         services.AddScoped<IValidationLogRepository, ValidationLogRepository>();
+        services.AddScoped<IAdminUserRepository, AdminUserRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddSingleton<IAdminPasswordHasher, AdminPasswordHasher>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the admin JWT settings (<c>AdminAuth:JwtKey</c>) and the token issuer. Without a key, an
+    /// ephemeral one is generated only if <paramref name="allowEphemeralKey"/> is true (Development).
+    /// </summary>
+    public static AdminJwtSettings AddAdminTokens(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool allowEphemeralKey)
+    {
+        var settings = AdminJwtSettings.FromConfiguration(configuration, allowEphemeralKey);
+        services.AddSingleton(settings);
+        services.AddSingleton<IAdminTokenIssuer, JwtAdminTokenIssuer>();
+        return settings;
     }
 
     public const string SigningKeySetting = "Signing:PrivateKey";

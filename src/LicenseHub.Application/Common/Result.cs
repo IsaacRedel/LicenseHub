@@ -6,6 +6,7 @@ public enum ErrorKind
     Validation = 1,
     NotFound = 2,
     Conflict = 3,
+    Unauthorized = 4,
 }
 
 /// <summary>A failure that callers can show or map to an HTTP status. <see cref="Code"/> is stable.</summary>
