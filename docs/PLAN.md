@@ -45,10 +45,11 @@ LicenseHub/
 | Entidade | Principais campos |
 | --- | --- |
 | **Product** | nome, slug, limite padrão de ativações |
-| **License** | produto, cliente, hash da chave, status (ativa, revogada, expirada), validade, máximo de ativações |
+| **License** | produto, cliente, hash da chave, status (ativa, revogada, expirada), validade, máximo de ativações; na revogação, data, motivo e admin |
 | **Activation** | licença, identificador da instância (`instanceId`), primeira e última validação |
 | **ValidationLog** | licença (vazia quando a chave não existe), resultado, IP, data |
 | **PaymentEvent** | id do evento no gateway, para não processar o mesmo pagamento duas vezes |
+| **AdminUser** | email, hash da senha, criado em, último login, falhas seguidas e fim do bloqueio |
 
 ## Decisões técnicas
 
@@ -61,7 +62,13 @@ LicenseHub/
 3. **Proteção contra replay.** O cliente manda um `nonce` e um timestamp. A resposta assinada devolve o `nonce`, o horário de emissão (`issuedAt`), o produto e a impressão da chave, e o cliente rejeita respostas antigas, repetidas ou de outro pedido. O servidor recusa com `400` um timestamp fora de ±5 minutos do seu relógio.
 4. **Rate limiting** com o middleware nativo do ASP.NET Core, particionado por IP e mais rígido em `validate`/`deactivate`, para limitar tentativas de adivinhar chaves. O `X-Forwarded-For` só é aceito de proxies configurados.
 5. **Webhook idempotente.** O mesmo evento de pagamento chegando duas vezes gera uma licença só.
-6. **Ativações sem corrida.** A ativação roda numa transação que trava a linha da licença (`SELECT … FOR UPDATE`), então instâncias novas validando ao mesmo tempo nunca passam do máximo de ativações.
+6. **Ativações sem corrida.** A ativação roda numa transação que trava a linha da licença (`SELECT … FOR UPDATE`), então instâncias novas validando ao mesmo tempo nunca passam do máximo de ativações. Revogar e liberar uma ativação usam o mesmo lock.
+7. **Admin com JWT curto, sem Identity completo.**
+   - O login devolve um JWT HS256 de 30 minutos, sem refresh token.
+   - A chave HMAC (`AdminAuth:JwtKey`, 256 bits ou mais) é separada da chave ECDSA das licenças.
+   - A senha usa só o `PasswordHasher` do ASP.NET Core (PBKDF2, salt aleatório, formato versionado). Tabelas, cookies e fluxos do Identity não fazem falta num painel com poucos admins.
+   - Email inexistente, senha errada e conta bloqueada recebem a mesma resposta. Cinco falhas seguidas bloqueiam a conta por 15 minutos.
+   - O login tem rate limit próprio, e não existe admin padrão: o primeiro é criado com o comando `admin create`.
 
 Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede quem edita o código do cliente.
 
@@ -72,11 +79,17 @@ Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede qu
 | `POST /v1/licenses/validate` | público, rate limited | valida a chave e devolve a resposta assinada |
 | `POST /v1/licenses/deactivate` | público, rate limited | libera uma ativação |
 | `GET /v1/signing-key` | público | chave pública (PEM) e `keyId` para verificar as respostas |
+| `POST /admin/auth/login` | público, rate limited | troca email e senha por um JWT de 30 minutos |
 | `POST /admin/products` | JWT de admin | cria um produto |
+| `GET /admin/products` | JWT de admin | lista os produtos |
+| `GET /admin/products/{id}` | JWT de admin | detalha um produto |
+| `PATCH /admin/products/{id}` | JWT de admin | muda nome e limite padrão de ativações (o slug é imutável) |
 | `POST /admin/licenses` | JWT de admin | emite uma licença (a chave aparece uma única vez) |
-| `POST /admin/licenses/{id}/revoke` | JWT de admin | revoga uma licença |
-| `GET /admin/licenses?status=&page=` | JWT de admin | lista com filtro e paginação |
-| `GET /admin/stats` | JWT de admin | validações por dia e licenças ativas |
+| `GET /admin/licenses?status=&productSlug=&page=&pageSize=` | JWT de admin | lista com filtro por status efetivo e produto, paginação e ordenação estável |
+| `GET /admin/licenses/{id}` | JWT de admin | detalhes e ativações, sem a chave nem o hash completo |
+| `POST /admin/licenses/{id}/revoke` | JWT de admin | revoga uma licença com motivo (idempotente) |
+| `DELETE /admin/licenses/{id}/activations/{instanceId}` | JWT de admin | libera uma vaga de ativação |
+| `GET /admin/stats` | JWT de admin | licenças por status, validações por dia e produtos mais validados |
 | `POST /webhooks/payments` | assinatura do gateway | gera a licença quando o pagamento é aprovado |
 | `GET /health` | público | verificação de saúde |
 

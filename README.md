@@ -25,7 +25,7 @@ O plano completo (arquitetura, modelo de dados, endpoints e decisões técnicas)
 - [x] **Etapa 0 — Base:** solução, Docker Compose com MariaDB e CI
 - [x] **Etapa 1 — Domínio:** entidades, migrations e emissão de licenças
 - [x] **Etapa 2 — Validação:** resposta assinada (ECDSA), ativações, nonce e rate limit
-- [ ] **Etapa 3 — Admin:** login com JWT, revogação e estatísticas
+- [x] **Etapa 3 — Admin:** login com JWT, revogação e estatísticas
 - [ ] **Etapa 4 — Painel:** dashboard em Blazor
 - [ ] **Etapa 5 — Automação:** webhook de pagamento e expiração automática
 - [ ] **Etapa 6 — Vitrine:** clientes de exemplo (C# e FiveM) e release v1.0.0
@@ -66,11 +66,16 @@ dotnet tool restore
 dotnet ef migrations add NomeDaMigration --project src/LicenseHub.Infrastructure --startup-project src/LicenseHub.Infrastructure --output-dir Persistence/Migrations
 ```
 
-### Chave de assinatura
+### Chaves
 
-A API assina as respostas com uma chave privada ECDSA P-256. Em Development, se nenhuma chave estiver configurada, ela gera uma chave temporária a cada inicialização e avisa no log. Em qualquer outro ambiente, a API não inicia sem a chave.
+A API usa duas chaves separadas:
 
-Para gerar um par de chaves:
+- **Chave de assinatura:** a chave privada ECDSA P-256 que assina as respostas de validação.
+- **Chave dos tokens de admin:** uma chave HMAC de no mínimo 256 bits.
+
+Em Development, se uma delas não estiver configurada, a API gera uma temporária a cada inicialização e avisa no log. Com a chave de admin temporária, os tokens deixam de valer quando a API reinicia. Em qualquer outro ambiente, a API não inicia sem as duas.
+
+Para gerar as chaves:
 
 ```bash
 # Com Docker (não precisa do banco)
@@ -82,11 +87,81 @@ dotnet run --project src/LicenseHub.Api -- keygen
 
 O comando imprime a linha pronta para cada forma de configuração:
 
-- **Docker Compose:** `SIGNING_PRIVATE_KEY=...` no `.env`;
-- **Variável de ambiente:** `Signing__PrivateKey=...`;
-- **`dotnet run` local:** `dotnet user-secrets set "Signing:PrivateKey" "..."`.
+- **Docker Compose:** `SIGNING_PRIVATE_KEY=...` e `ADMIN_JWT_KEY=...` no `.env`;
+- **Variáveis de ambiente:** `Signing__PrivateKey=...` e `AdminAuth__JwtKey=...`;
+- **`dotnet run` local:** `dotnet user-secrets set "Signing:PrivateKey" "..."` e `dotnet user-secrets set "AdminAuth:JwtKey" "..."`.
 
-A chave privada nunca vai para o repositório. A chave pública é servida em `GET /v1/signing-key` e deve ser embutida nos clientes.
+As chaves privadas nunca vão para o repositório. A chave pública de assinatura é servida em `GET /v1/signing-key` e deve ser embutida nos clientes.
+
+## 🛠️ Área de admin
+
+As rotas `/admin/*` gerenciam produtos e licenças e exigem um token de admin, exceto o login.
+
+### 1. Crie o primeiro admin
+
+Não existe usuário nem senha padrão. O comando funciona em qualquer ambiente e pede a senha duas vezes, sem mostrar na tela (mínimo de 12 caracteres):
+
+```bash
+# Com Docker
+docker compose run --rm api admin create --email voce@exemplo.com
+
+# Ou com o SDK
+dotnet run --project src/LicenseHub.Api -- admin create --email voce@exemplo.com
+
+# Em automação, a senha pode vir da entrada padrão
+printf '%s\n' "$ADMIN_PASSWORD" | docker compose run --rm -T api admin create --email voce@exemplo.com --password-stdin
+```
+
+### 2. Faça login
+
+```bash
+curl -s http://localhost:8080/admin/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{ "email": "voce@exemplo.com", "password": "sua-senha" }'
+```
+
+```json
+{ "accessToken": "eyJhbGciOi...", "tokenType": "Bearer", "expiresAt": "2026-11-16T12:30:00Z" }
+```
+
+- **Validade:** o token vale 30 minutos e não há refresh token. Quando expirar, faça login de novo.
+- **Mensagem única:** email inexistente, senha errada e conta bloqueada recebem o mesmo `401`, para a resposta não revelar quais contas existem.
+- **Bloqueio:** 5 falhas seguidas bloqueiam a conta por 15 minutos.
+- **Rate limit:** o login aceita 5 tentativas por minuto por IP.
+
+### 3. Use o token
+
+Envie o token no cabeçalho `Authorization`:
+
+```bash
+TOKEN="eyJhbGciOi..."
+
+# Criar um produto
+curl -s http://localhost:8080/admin/products -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{ "name": "FiveM Garage", "slug": "fivem-garage", "defaultMaxActivations": 2 }'
+
+# Emitir uma licença (a chave aparece só nesta resposta)
+curl -s http://localhost:8080/admin/licenses -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{ "productId": "<id do produto>", "customerEmail": "cliente@exemplo.com" }'
+```
+
+No Scalar (<http://localhost:8080/scalar>), faça o login e cole o `accessToken` no campo de autenticação Bearer, que vale para as rotas de admin. No arquivo `.http`, o login preenche o token das chamadas seguintes automaticamente.
+
+| Rota | O que faz |
+| --- | --- |
+| `POST /admin/auth/login` | troca email e senha por um token de 30 minutos |
+| `POST` / `GET /admin/products` | cria e lista produtos |
+| `GET` / `PATCH /admin/products/{id}` | detalha um produto ou muda nome e limite padrão de ativações (o `slug` não muda) |
+| `POST /admin/licenses` | emite uma licença; a chave aparece só nesta resposta |
+| `GET /admin/licenses?status=&productSlug=&page=&pageSize=` | lista com filtro e paginação: `status` aceita `active`, `revoked` ou `expired`, e `pageSize` vai até 100 |
+| `GET /admin/licenses/{id}` | detalhes, ativações e revogação; nunca a chave nem o hash completo |
+| `POST /admin/licenses/{id}/revoke` | revoga com `{ "reason" }`; repetir não muda a revogação original |
+| `DELETE /admin/licenses/{id}/activations/{instanceId}` | libera uma vaga de ativação |
+| `GET /admin/stats` | licenças por status, validações por dia (30 dias) e produtos mais validados |
+
+Na listagem, o `status` é o status efetivo: uma licença ativa com `expiresAt` vencido aparece como `expired`.
 
 ## 🔐 Como validar uma licença
 
@@ -110,7 +185,7 @@ curl -s http://localhost:8080/v1/licenses/validate \
 | `nonce` | De 16 a 128 caracteres base64url, gerados pelo cliente a cada chamada. |
 | `timestamp` | Relógio do cliente em segundos Unix. Fora de ±5 minutos do servidor, a resposta é `400`. |
 
-A resposta é sempre `200`, inclusive quando a licença não vale, e vem assinada:
+Quando a requisição é válida, a resposta é `200`, inclusive quando a licença não vale, e vem assinada:
 
 ```json
 { "payload": "eyJ2YWxpZCI6dHJ1ZSwi...", "signature": "dF1uO8I4y7J1hJry5ApN...", "keyId": "q1Zr8xT0aJ3mVb2c" }
