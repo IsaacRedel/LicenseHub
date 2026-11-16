@@ -22,6 +22,41 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("LicenseHub.Domain.Admins.AdminUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("varchar(254)");
+
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTimeOffset?>("LockoutEndsAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("admin_users", (string)null);
+                });
+
             modelBuilder.Entity("LicenseHub.Domain.Licenses.Activation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -76,8 +111,15 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("RevokedByAdminId")
+                        .HasColumnType("char(36)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -89,9 +131,13 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                     b.HasIndex("KeyHash")
                         .IsUnique();
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("RevokedByAdminId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("CreatedAt", "Id");
+
+                    b.HasIndex("ProductId", "Status");
 
                     b.ToTable("licenses", (string)null);
                 });
@@ -179,7 +225,7 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt");
+                    b.HasIndex("CreatedAt", "Outcome");
 
                     b.HasIndex("LicenseId", "CreatedAt");
 
@@ -202,6 +248,11 @@ namespace LicenseHub.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("LicenseHub.Domain.Admins.AdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByAdminId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("LicenseHub.Domain.Payments.PaymentEvent", b =>

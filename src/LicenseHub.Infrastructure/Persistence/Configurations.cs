@@ -1,3 +1,4 @@
+using LicenseHub.Domain.Admins;
 using LicenseHub.Domain.Common;
 using LicenseHub.Domain.Licenses;
 using LicenseHub.Domain.Payments;
@@ -42,14 +43,37 @@ internal sealed class LicenseConfiguration : IEntityTypeConfiguration<License>
             .HasColumnType($"binary({LicenseKey.HashLength})")
             .IsRequired();
         builder.Property(l => l.Status).HasConversion<string>().HasMaxLength(16);
+        builder.Property(l => l.RevocationReason).HasMaxLength(Limits.RevocationReasonLength);
 
         builder.HasIndex(l => l.KeyHash).IsUnique();
         builder.HasIndex(l => l.Status);
+
+        // Admin listing: newest first with Id as a stable tie-breaker, and filters by product and status.
+        builder.HasIndex(l => new { l.CreatedAt, l.Id });
+        builder.HasIndex(l => new { l.ProductId, l.Status });
 
         builder.HasOne<Product>()
             .WithMany()
             .HasForeignKey(l => l.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<AdminUser>()
+            .WithMany()
+            .HasForeignKey(l => l.RevokedByAdminId)
+            .OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
+internal sealed class AdminUserConfiguration : IEntityTypeConfiguration<AdminUser>
+{
+    public void Configure(EntityTypeBuilder<AdminUser> builder)
+    {
+        builder.ToTable("admin_users");
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.Id).ValueGeneratedNever();
+        builder.Property(a => a.Email).HasMaxLength(Limits.EmailLength).IsRequired();
+        builder.Property(a => a.PasswordHash).HasMaxLength(Limits.PasswordHashLength).IsRequired();
+        builder.HasIndex(a => a.Email).IsUnique();
     }
 }
 
@@ -85,7 +109,9 @@ internal sealed class ValidationLogConfiguration : IEntityTypeConfiguration<Vali
         builder.Property(v => v.IpAddress).HasMaxLength(Limits.IpAddressLength);
 
         builder.HasIndex(v => new { v.LicenseId, v.CreatedAt });
-        builder.HasIndex(v => v.CreatedAt);
+
+        // Admin stats group the last 30 days by day and outcome; this also serves plain date ranges.
+        builder.HasIndex(v => new { v.CreatedAt, v.Outcome });
 
         builder.HasOne<License>()
             .WithMany()

@@ -23,7 +23,7 @@ public sealed class LicenseActivationTests
     {
         var license = NewLicense();
 
-        license.Revoke(Now.AddMinutes(1));
+        license.Revoke(Now.AddMinutes(1), "Chargeback");
 
         Assert.Equal(ValidationOutcome.Revoked, license.CheckUsable(Now.AddMinutes(2)));
         Assert.Equal(LicenseStatus.Revoked, license.Status);
@@ -35,8 +35,8 @@ public sealed class LicenseActivationTests
     {
         var license = NewLicense();
 
-        license.Revoke(Now.AddMinutes(1));
-        license.Revoke(Now.AddMinutes(5));
+        license.Revoke(Now.AddMinutes(1), "Chargeback");
+        license.Revoke(Now.AddMinutes(5), "Chargeback");
 
         Assert.Equal(Now.AddMinutes(1), license.RevokedAt);
     }
@@ -127,7 +127,7 @@ public sealed class LicenseActivationTests
     {
         var license = NewLicense();
         var existing = Activation.Create(license.Id, "srv-01", Now);
-        license.Revoke(Now);
+        license.Revoke(Now, "Chargeback");
 
         var result = license.Activate([existing], "srv-01", Now.AddHours(1));
 

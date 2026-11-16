@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using LicenseHub.Domain.Common;
 using LicenseHub.Domain.Products;
 using LicenseHub.Domain.Validation;
@@ -30,6 +29,11 @@ public sealed class License
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? RevokedAt { get; private set; }
+
+    public string? RevocationReason { get; private set; }
+
+    /// <summary>The admin who revoked the license; null if revoked by the system or the admin was removed.</summary>
+    public Guid? RevokedByAdminId { get; private set; }
 
     /// <summary>
     /// Issues an active license for <paramref name="product"/>.
@@ -123,28 +127,42 @@ public sealed class License
         return ActivationResult.Accepted(Activation.Create(Id, normalizedInstanceId, now), isNew: true);
     }
 
-    /// <summary>Revokes the license. Revoking twice keeps the first revocation date.</summary>
-    public void Revoke(DateTimeOffset now)
+    /// <summary>
+    /// Status as of <paramref name="now"/>: an active license past <see cref="ExpiresAt"/> counts as expired even
+    /// before a job stores <see cref="LicenseStatus.Expired"/>.
+    /// </summary>
+    public LicenseStatus EffectiveStatus(DateTimeOffset now) => CheckUsable(now) switch
     {
+        ValidationOutcome.Revoked => LicenseStatus.Revoked,
+        ValidationOutcome.Expired => LicenseStatus.Expired,
+        _ => LicenseStatus.Active,
+    };
+
+    /// <summary>
+    /// Revokes the license. Idempotent: revoking an already revoked license changes nothing and keeps the
+    /// original date, reason and admin.
+    /// </summary>
+    /// <returns>True when this call revoked the license; false when it was already revoked.</returns>
+    public bool Revoke(DateTimeOffset now, string reason, Guid? revokedByAdminId = null)
+    {
+        var normalizedReason = Guard.RequiredText(reason, Limits.RevocationReasonLength, "license.invalid_revocation_reason", "Reason");
+        if (revokedByAdminId == Guid.Empty)
+        {
+            throw new DomainException("license.invalid_revoked_by", "Revoking admin id cannot be empty.");
+        }
+
         if (Status == LicenseStatus.Revoked)
         {
-            return;
+            return false;
         }
 
         Status = LicenseStatus.Revoked;
         RevokedAt = now.ToUniversalTime();
+        RevocationReason = normalizedReason;
+        RevokedByAdminId = revokedByAdminId;
+        return true;
     }
 
-    private static string NormalizeEmail(string? email)
-    {
-        var trimmed = Guard.RequiredText(email, Limits.EmailLength, "license.invalid_customer_email", "Customer email");
-
-        // MailAddress also accepts display names ("Name <a@b.c>"); requiring Address == input keeps bare addresses only.
-        if (!MailAddress.TryCreate(trimmed, out var address) || address.Address != trimmed)
-        {
-            throw new DomainException("license.invalid_customer_email", "Customer email is not a valid address.");
-        }
-
-        return trimmed;
-    }
+    private static string NormalizeEmail(string? email) =>
+        Guard.Email(email, "license.invalid_customer_email", "Customer email");
 }

@@ -130,7 +130,7 @@ public sealed class ValidateLicenseHandlerTests
     public async Task HandleAsync_ReturnsRevoked()
     {
         var (license, key) = AddLicense();
-        license.Revoke(Now.AddMinutes(-1));
+        license.Revoke(Now.AddMinutes(-1), "Chargeback");
 
         var result = await Validate(key);
 

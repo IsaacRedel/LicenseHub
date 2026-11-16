@@ -34,6 +34,19 @@ internal static class Guard
         return trimmed;
     }
 
+    /// <summary>A bare email address ("a@b.c"), trimmed. Display-name forms ("Name &lt;a@b.c&gt;") are rejected.</summary>
+    public static string Email(string? value, string code, string field)
+    {
+        var trimmed = RequiredText(value, Limits.EmailLength, code, field);
+
+        if (!System.Net.Mail.MailAddress.TryCreate(trimmed, out var address) || address.Address != trimmed)
+        {
+            throw new DomainException(code, $"{field} is not a valid address.");
+        }
+
+        return trimmed;
+    }
+
     public static int ActivationLimit(int value, string code)
     {
         if (value is < 1 or > Limits.MaxActivations)

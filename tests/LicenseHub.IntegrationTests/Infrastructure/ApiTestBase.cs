@@ -55,7 +55,7 @@ public abstract class ApiTestBase(MariaDbFixture database, int licensesPermitLim
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<LicenseHubDbContext>();
         var license = await db.Licenses.SingleAsync(l => l.Id == licenseId, Token);
-        license.Revoke(DateTimeOffset.UtcNow);
+        license.Revoke(DateTimeOffset.UtcNow, "Chargeback");
         await db.SaveChangesAsync(Token);
     }
 

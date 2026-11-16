@@ -1,3 +1,4 @@
+using LicenseHub.Domain.Admins;
 using LicenseHub.Domain.Licenses;
 using LicenseHub.Domain.Payments;
 using LicenseHub.Domain.Products;
@@ -23,6 +24,8 @@ public sealed class LicenseHubDbContext(DbContextOptions<LicenseHubDbContext> op
     public DbSet<ValidationLog> ValidationLogs => Set<ValidationLog>();
 
     public DbSet<PaymentEvent> PaymentEvents => Set<PaymentEvent>();
+
+    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

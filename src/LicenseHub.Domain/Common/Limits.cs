@@ -11,4 +11,6 @@ public static class Limits
     public const int GatewayLength = 32;
     public const int ExternalEventIdLength = 128;
     public const int MaxActivations = 10_000;
+    public const int RevocationReasonLength = 500;
+    public const int PasswordHashLength = 256;
 }

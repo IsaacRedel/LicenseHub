@@ -29,6 +29,21 @@ public sealed partial class Product
         CreatedAt = now.ToUniversalTime(),
     };
 
+    /// <summary>
+    /// Changes the name and/or the default activation limit; null leaves a field unchanged. The slug is
+    /// immutable because installed clients send it. A new default applies only to licenses issued afterwards.
+    /// </summary>
+    public void Update(string? name, int? defaultMaxActivations)
+    {
+        var newName = name is null ? Name : Guard.RequiredText(name, Limits.ProductNameLength, "product.invalid_name", "Name");
+        var newMax = defaultMaxActivations is { } max
+            ? Guard.ActivationLimit(max, "product.invalid_max_activations")
+            : DefaultMaxActivations;
+
+        Name = newName;
+        DefaultMaxActivations = newMax;
+    }
+
     /// <summary>Trims and lowercases a slug, then checks that it is kebab-case.</summary>
     public static string NormalizeSlug(string? slug)
     {

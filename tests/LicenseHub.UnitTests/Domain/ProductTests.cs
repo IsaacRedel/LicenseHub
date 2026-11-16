@@ -65,4 +65,27 @@ public sealed class ProductTests
 
         Assert.Equal("product.invalid_max_activations", error.Code);
     }
+
+    [Fact]
+    public void Update_ChangesOnlyTheGivenFieldsAndKeepsTheSlug()
+    {
+        var product = Product.Create("FiveM Garage", "fivem-garage", 2, Now);
+
+        product.Update(" Garage Pro ", null);
+        Assert.Equal(("Garage Pro", 2, "fivem-garage"), (product.Name, product.DefaultMaxActivations, product.Slug));
+
+        product.Update(null, 5);
+        Assert.Equal(("Garage Pro", 5), (product.Name, product.DefaultMaxActivations));
+    }
+
+    [Fact]
+    public void Update_RejectsInvalidValuesWithoutPartialChanges()
+    {
+        var product = Product.Create("FiveM Garage", "fivem-garage", 2, Now);
+
+        var error = Assert.Throws<DomainException>(() => product.Update("New name", 0));
+
+        Assert.Equal("product.invalid_max_activations", error.Code);
+        Assert.Equal(("FiveM Garage", 2), (product.Name, product.DefaultMaxActivations));
+    }
 }
