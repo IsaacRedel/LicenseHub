@@ -23,12 +23,25 @@ public sealed class Activation
     {
         Id = Guid.CreateVersion7(now),
         LicenseId = Guard.RequiredId(licenseId, "activation.invalid_license", "License"),
-        InstanceId = Guard.RequiredText(
-            instanceId,
-            Limits.InstanceIdLength,
-            "activation.invalid_instance_id",
-            "Instance id"),
+        InstanceId = NormalizeInstanceId(instanceId),
         FirstValidatedAt = now.ToUniversalTime(),
         LastValidatedAt = now.ToUniversalTime(),
     };
+
+    /// <summary>Trims and checks an instance id. Instance ids compare ordinally (case-sensitive).</summary>
+    public static string NormalizeInstanceId(string? instanceId) => Guard.RequiredText(
+        instanceId,
+        Limits.InstanceIdLength,
+        "activation.invalid_instance_id",
+        "Instance id");
+
+    /// <summary>Records a successful validation from this instance.</summary>
+    public void Touch(DateTimeOffset now)
+    {
+        var utcNow = now.ToUniversalTime();
+        if (utcNow > LastValidatedAt)
+        {
+            LastValidatedAt = utcNow;
+        }
+    }
 }

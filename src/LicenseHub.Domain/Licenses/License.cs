@@ -1,6 +1,7 @@
 using System.Net.Mail;
 using LicenseHub.Domain.Common;
 using LicenseHub.Domain.Products;
+using LicenseHub.Domain.Validation;
 
 namespace LicenseHub.Domain.Licenses;
 
@@ -68,6 +69,70 @@ public sealed class License
                 "license.invalid_max_activations"),
             CreatedAt = now.ToUniversalTime(),
         };
+    }
+
+    /// <summary>Whether the license can be used right now, ignoring activations.</summary>
+    public ValidationOutcome CheckUsable(DateTimeOffset now)
+    {
+        if (Status == LicenseStatus.Revoked)
+        {
+            return ValidationOutcome.Revoked;
+        }
+
+        if (Status == LicenseStatus.Expired || (ExpiresAt is { } expiry && expiry <= now))
+        {
+            return ValidationOutcome.Expired;
+        }
+
+        return ValidationOutcome.Valid;
+    }
+
+    /// <summary>
+    /// Validates the license for <paramref name="instanceId"/>. An instance that is already active is
+    /// refreshed; a new instance is activated only while the license is below <see cref="MaxActivations"/>.
+    /// </summary>
+    /// <param name="activations">All current activations of this license.</param>
+    public ActivationResult Activate(IReadOnlyCollection<Activation> activations, string instanceId, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(activations);
+        if (activations.Any(a => a.LicenseId != Id))
+        {
+            throw new ArgumentException("Activations must belong to this license.", nameof(activations));
+        }
+
+        var normalizedInstanceId = Activation.NormalizeInstanceId(instanceId);
+
+        var usable = CheckUsable(now);
+        if (usable != ValidationOutcome.Valid)
+        {
+            return ActivationResult.Rejected(usable);
+        }
+
+        var existing = activations.FirstOrDefault(a => string.Equals(a.InstanceId, normalizedInstanceId, StringComparison.Ordinal));
+        if (existing is not null)
+        {
+            existing.Touch(now);
+            return ActivationResult.Accepted(existing, isNew: false);
+        }
+
+        if (activations.Count >= MaxActivations)
+        {
+            return ActivationResult.Rejected(ValidationOutcome.ActivationLimitReached);
+        }
+
+        return ActivationResult.Accepted(Activation.Create(Id, normalizedInstanceId, now), isNew: true);
+    }
+
+    /// <summary>Revokes the license. Revoking twice keeps the first revocation date.</summary>
+    public void Revoke(DateTimeOffset now)
+    {
+        if (Status == LicenseStatus.Revoked)
+        {
+            return;
+        }
+
+        Status = LicenseStatus.Revoked;
+        RevokedAt = now.ToUniversalTime();
     }
 
     private static string NormalizeEmail(string? email)
