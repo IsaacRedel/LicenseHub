@@ -1,6 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!-- Fork of Pomelo.EntityFrameworkCore.MySql with EF Core 10 support (Pomelo 9.0.0 targets EF Core 9 only). -->
+    <PackageReference Include="Microting.EntityFrameworkCore.MySql" />
+    <!-- Pins EF Core for every consumer; the provider accepts [10.0.14, 10.0.999]. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\LicenseHub.Application\LicenseHub.Application.csproj" />
   </ItemGroup>
 

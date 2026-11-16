@@ -4,7 +4,11 @@
   </PropertyGroup>
 
   <ItemGroup Label="Runtime">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.15" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.15" />
+    <PackageVersion Include="Microting.EntityFrameworkCore.MySql" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

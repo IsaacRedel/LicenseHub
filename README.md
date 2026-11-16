@@ -54,6 +54,13 @@ dotnet test
 
 As portas ficam presas a `127.0.0.1`: API em `8080` e MariaDB em `3307`. As duas podem ser trocadas no `.env`.
 
+No Docker Compose, a API aplica as migrations ao iniciar. Para criar uma nova migration:
+
+```bash
+dotnet tool restore
+dotnet ef migrations add NomeDaMigration --project src/LicenseHub.Infrastructure --startup-project src/LicenseHub.Infrastructure --output-dir Persistence/Migrations
+```
+
 ## 📄 Licença
 
 [MIT](LICENSE)
