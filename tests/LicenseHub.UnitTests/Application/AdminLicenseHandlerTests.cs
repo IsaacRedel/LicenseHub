@@ -131,5 +131,8 @@ public sealed class AdminLicenseHandlerTests
 
         public Task<LicenseDetails?> GetLicenseAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+
+        public Task<AdminStats> GetStatsAsync(DateTimeOffset now, int days, int topProducts, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

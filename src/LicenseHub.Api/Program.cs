@@ -135,7 +135,8 @@ app.MapHealthChecks("/health");
 app.MapLicenseEndpoints();
 app.MapAdminEndpoints()
     .MapAdminProducts()
-    .MapAdminLicenses();
+    .MapAdminLicenses()
+    .MapAdminStats();
 
 await app.RunAsync();
 return 0;

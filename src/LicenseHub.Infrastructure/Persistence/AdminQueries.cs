@@ -1,6 +1,7 @@
 using LicenseHub.Application.Admins;
 using LicenseHub.Domain.Licenses;
 using LicenseHub.Domain.Products;
+using LicenseHub.Domain.Validation;
 using Microsoft.EntityFrameworkCore;
 
 namespace LicenseHub.Infrastructure.Persistence;
@@ -123,6 +124,72 @@ internal sealed class AdminQueries(LicenseHubDbContext db) : IAdminQueries
             revocation,
             activations);
     }
+
+    public async Task<AdminStats> GetStatsAsync(DateTimeOffset now, int days, int topProducts, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(days, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(topProducts, 1);
+
+        var licenses = db.Licenses.AsNoTracking();
+        var byStatus = new LicenseStatusCounts(
+            await licenses.CountAsync(
+                l => l.Status == LicenseStatus.Active && (l.ExpiresAt == null || l.ExpiresAt > now),
+                cancellationToken),
+            await licenses.CountAsync(l => l.Status == LicenseStatus.Revoked, cancellationToken),
+            await licenses.CountAsync(
+                l => l.Status == LicenseStatus.Expired
+                     || (l.Status == LicenseStatus.Active && l.ExpiresAt != null && l.ExpiresAt <= now),
+                cancellationToken));
+
+        var firstDay = DateOnly.FromDateTime(now.UtcDateTime).AddDays(-(days - 1));
+        var since = new DateTimeOffset(firstDay.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+
+        // CreatedAt is stored in UTC, so DATE() gives the UTC day. Served by IX_validation_logs_CreatedAt_Outcome.
+        var dailyRows = await db.Database
+            .SqlQuery<DailyOutcomeRow>($"""
+                SELECT DATE(CreatedAt) AS Day, Outcome, COUNT(*) AS Total
+                FROM validation_logs
+                WHERE CreatedAt >= {since}
+                GROUP BY DATE(CreatedAt), Outcome
+                """)
+            .ToListAsync(cancellationToken);
+
+        var perDay = Enumerable.Range(0, days)
+            .Select(offset => firstDay.AddDays(offset))
+            .Select(day =>
+            {
+                int Count(ValidationOutcome outcome) => (int)dailyRows
+                    .Where(r => DateOnly.FromDateTime(r.Day) == day && r.Outcome == outcome.ToString())
+                    .Sum(r => r.Total);
+
+                return new DailyValidations(
+                    day,
+                    Count(ValidationOutcome.Valid),
+                    Count(ValidationOutcome.UnknownKey),
+                    Count(ValidationOutcome.ProductMismatch),
+                    Count(ValidationOutcome.Revoked),
+                    Count(ValidationOutcome.Expired),
+                    Count(ValidationOutcome.ActivationLimitReached));
+            })
+            .ToList();
+
+        var top = await (from log in db.ValidationLogs.AsNoTracking()
+                         where log.CreatedAt >= since && log.LicenseId != null
+                         join license in db.Licenses on log.LicenseId equals license.Id
+                         join product in db.Products on license.ProductId equals product.Id
+                         group product by new { product.Id, product.Slug, product.Name } into g
+                         orderby g.Count() descending, g.Key.Name
+                         select new { g.Key.Id, g.Key.Slug, g.Key.Name, Validations = g.Count() })
+            .Take(topProducts)
+            .ToListAsync(cancellationToken);
+
+        return new AdminStats(
+            byStatus,
+            perDay,
+            top.Select(p => new ProductValidations(p.Id, p.Slug, p.Name, p.Validations)).ToList());
+    }
+
+    private sealed record DailyOutcomeRow(DateTime Day, string Outcome, long Total);
 
     private IQueryable<ProductView> ToViews(IQueryable<Product> products) =>
         products.AsNoTracking().Select(p => new ProductView(

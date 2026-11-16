@@ -47,6 +47,28 @@ public sealed record LicenseDetails(
     RevocationView? Revocation,
     IReadOnlyList<ActivationView> Activations);
 
+public sealed record LicenseStatusCounts(int Active, int Revoked, int Expired);
+
+/// <summary>Validations of one UTC day, by outcome.</summary>
+public sealed record DailyValidations(
+    DateOnly Date,
+    int Valid,
+    int UnknownKey,
+    int ProductMismatch,
+    int Revoked,
+    int Expired,
+    int ActivationLimitReached);
+
+/// <param name="Validations">Validations of this product's licenses in the period (unknown keys have no product).</param>
+public sealed record ProductValidations(Guid ProductId, string Slug, string Name, int Validations);
+
+/// <param name="LicensesByStatus">Effective status, like the license list.</param>
+/// <param name="ValidationsPerDay">Every day of the period in order, including days without validations.</param>
+public sealed record AdminStats(
+    LicenseStatusCounts LicensesByStatus,
+    IReadOnlyList<DailyValidations> ValidationsPerDay,
+    IReadOnlyList<ProductValidations> TopProducts);
+
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalItems, int TotalPages);
 
 /// <param name="Status">Effective status to filter by; null for any.</param>
@@ -66,4 +88,10 @@ public interface IAdminQueries
     Task<PagedResult<LicenseListItem>> ListLicensesAsync(LicenseFilter filter, CancellationToken cancellationToken);
 
     Task<LicenseDetails?> GetLicenseAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// License counts by effective status, validations per UTC day over the last <paramref name="days"/> days
+    /// (today included) and the <paramref name="topProducts"/> products with most validations in that period.
+    /// </summary>
+    Task<AdminStats> GetStatsAsync(DateTimeOffset now, int days, int topProducts, CancellationToken cancellationToken);
 }
