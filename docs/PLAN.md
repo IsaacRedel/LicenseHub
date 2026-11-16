@@ -46,17 +46,22 @@ LicenseHub/
 | --- | --- |
 | **Product** | nome, slug, limite padrão de ativações |
 | **License** | produto, cliente, hash da chave, status (ativa, revogada, expirada), validade, máximo de ativações |
-| **Activation** | licença, identificador do servidor, primeira e última validação |
-| **ValidationLog** | licença, resultado, IP, data |
+| **Activation** | licença, identificador da instância (`instanceId`), primeira e última validação |
+| **ValidationLog** | licença (vazia quando a chave não existe), resultado, IP, data |
 | **PaymentEvent** | id do evento no gateway, para não processar o mesmo pagamento duas vezes |
 
 ## Decisões técnicas
 
 1. **A chave fica salva como hash, igual a uma senha.** O cliente recebe `LH-XXXX-XXXX-XXXX-XXXX` uma vez só, e o banco guarda apenas o hash SHA-256.
 2. **A resposta da validação é assinada.** A API assina o resultado com uma chave privada (ECDSA), e o cliente tem a chave pública embutida. Ninguém consegue montar um servidor falso que responda "licença válida".
-3. **Proteção contra replay.** O cliente manda um `nonce` e um timestamp, a resposta assinada devolve os dois, e o cliente rejeita respostas antigas ou repetidas.
-4. **Rate limiting** com o middleware nativo do ASP.NET Core, para limitar tentativas de adivinhar chaves.
+   - ECDSA P-256 com SHA-256 (ES256), assinatura no formato IEEE P1363 (`r || s`, 64 bytes).
+   - A resposta é `{ payload, signature, keyId }`: `payload` é o JSON em base64url, e a assinatura cobre exatamente esses bytes, nunca um JSON re-serializado.
+   - O `keyId` são os 16 primeiros caracteres do base64url do SHA-256 da chave pública, o que prepara a troca de chave.
+   - A chave privada vem de configuração (`Signing:PrivateKey`), nunca do repositório.
+3. **Proteção contra replay.** O cliente manda um `nonce` e um timestamp, a resposta assinada devolve os dois, e o cliente rejeita respostas antigas ou repetidas. O servidor recusa com `400` um timestamp fora de ±5 minutos do seu relógio.
+4. **Rate limiting** com o middleware nativo do ASP.NET Core, particionado por IP e mais rígido em `validate`/`deactivate`, para limitar tentativas de adivinhar chaves. O `X-Forwarded-For` só é aceito de proxies configurados.
 5. **Webhook idempotente.** O mesmo evento de pagamento chegando duas vezes gera uma licença só.
+6. **Ativações sem corrida.** A ativação roda numa transação que trava a linha da licença (`SELECT … FOR UPDATE`), então instâncias novas validando ao mesmo tempo nunca passam do máximo de ativações.
 
 Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede quem edita o código do cliente.
 
@@ -66,6 +71,7 @@ Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede qu
 | --- | --- | --- |
 | `POST /v1/licenses/validate` | público, rate limited | valida a chave e devolve a resposta assinada |
 | `POST /v1/licenses/deactivate` | público, rate limited | libera uma ativação |
+| `GET /v1/signing-key` | público | chave pública (PEM) e `keyId` para verificar as respostas |
 | `POST /admin/products` | JWT de admin | cria um produto |
 | `POST /admin/licenses` | JWT de admin | emite uma licença (a chave aparece uma única vez) |
 | `POST /admin/licenses/{id}/revoke` | JWT de admin | revoga uma licença |
@@ -73,6 +79,19 @@ Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede qu
 | `GET /admin/stats` | JWT de admin | validações por dia e licenças ativas |
 | `POST /webhooks/payments` | assinatura do gateway | gera a licença quando o pagamento é aprovado |
 | `GET /health` | público | verificação de saúde |
+
+### Contrato da validação
+
+- **Pedido:** `{ key, productSlug, instanceId, nonce, timestamp }`.
+  - `nonce` tem de 16 a 128 caracteres base64url.
+  - `timestamp` é em segundos Unix.
+- **Payload assinado:** `{ valid, reason, licenseId, expiresAt, nonce, instanceId, issuedAt }`, com datas em segundos Unix.
+- **Resultados de negócio:** voltam `200` com `valid=false` e um `reason`, também assinados.
+  - Os valores de `reason` são `unknown_key`, `product_mismatch`, `revoked`, `expired` e `activation_limit_reached`.
+  - Em `unknown_key` e `product_mismatch`, `licenseId` e `expiresAt` vêm nulos.
+- **Outros status:** requisição malformada ou timestamp fora da janela dá `400` (problem details com `code`), e excesso de chamadas dá `429` com `Retry-After`.
+- **Log:** toda tentativa que passa da validação de entrada gera um `ValidationLog`.
+- **`deactivate`:** responde `204`, ou o mesmo `404` para chave ou instância desconhecida, para não revelar se a chave existe.
 
 ## Roteiro por etapas
 
