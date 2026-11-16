@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using LicenseHub.Api.Commands;
 using LicenseHub.Api.Endpoints;
 using LicenseHub.Api.Infrastructure;
@@ -49,6 +51,10 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
     }
 });
 builder.Services.AddOpenApi();
+
+// Enums as camelCase strings ("active", "revoked") in admin responses.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 
 // Development defaults to throwing on unreadable bodies, which the exception handler would turn into a 500.
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
@@ -128,7 +134,8 @@ if (app.Environment.IsDevelopment())
 app.MapHealthChecks("/health");
 app.MapLicenseEndpoints();
 app.MapAdminEndpoints()
-    .MapAdminProducts();
+    .MapAdminProducts()
+    .MapAdminLicenses();
 
 await app.RunAsync();
 return 0;

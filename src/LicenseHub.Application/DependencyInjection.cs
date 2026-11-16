@@ -18,6 +18,9 @@ public static class DependencyInjection
         services.AddScoped<LoginHandler>();
         services.AddScoped<CreateAdminHandler>();
         services.AddScoped<UpdateProductHandler>();
+        services.AddScoped<ListLicensesHandler>();
+        services.AddScoped<RevokeLicenseHandler>();
+        services.AddScoped<ReleaseActivationHandler>();
         return services;
     }
 }
