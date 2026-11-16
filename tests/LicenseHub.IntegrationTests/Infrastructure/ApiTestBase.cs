@@ -1,8 +1,10 @@
 using System.Buffers.Text;
 using System.Globalization;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using LicenseHub.Api.Endpoints;
+using LicenseHub.Application.Admins;
 using LicenseHub.Application.Licenses;
 using LicenseHub.Application.Products;
 using LicenseHub.Infrastructure.Auth;
@@ -84,6 +86,35 @@ public abstract class ApiTestBase(MariaDbFixture database, int licensesPermitLim
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         return await query(scope.ServiceProvider.GetRequiredService<LicenseHubDbContext>());
+    }
+
+    protected const string AdminPassword = "integration-admin-password";
+
+    /// <summary>Creates an admin through the use case and returns its email.</summary>
+    protected async Task<string> CreateAdminAsync(string? email = null)
+    {
+        email ??= $"admin-{Guid.NewGuid():N}@example.com";
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<CreateAdminHandler>()
+            .HandleAsync(new CreateAdminCommand(email, AdminPassword), Token);
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        return result.Value.Email;
+    }
+
+    protected Task<HttpResponseMessage> LoginAsync(string email, string password) =>
+        Client.PostAsJsonAsync("/admin/auth/login", new { email, password }, Token);
+
+    /// <summary>A client authenticated as a newly created admin.</summary>
+    protected async Task<HttpClient> CreateAdminClientAsync()
+    {
+        var email = await CreateAdminAsync();
+        var login = await LoginAsync(email, AdminPassword);
+        login.EnsureSuccessStatusCode();
+        var token = (await login.Content.ReadFromJsonAsync<AdminLoginResponse>(Token))!.AccessToken;
+
+        var client = Factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
     }
 
     protected static ValidateLicenseRequest NewRequest(string key, string productSlug, string instanceId) => new(
