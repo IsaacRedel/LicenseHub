@@ -1,0 +1,76 @@
+### LicenseHub API examples (VS Code REST Client or Visual Studio).
+### 1. Start the stack: docker compose up -d --build
+### 2. Create a demo license: docker compose run --rm api seed
+### 3. Paste the printed key below.
+
+@baseUrl = http://localhost:8080
+@key = LH-XXXX-XXXX-XXXX-XXXX
+@productSlug = demo
+@instanceId = local-server-01
+
+### Health
+GET {{baseUrl}}/health
+
+### Public key that verifies validation responses
+GET {{baseUrl}}/v1/signing-key
+
+### Validate (activates the instance on first use)
+# The response payload is base64url JSON; decode it and verify the signature with the key above.
+POST {{baseUrl}}/v1/licenses/validate
+Content-Type: application/json
+
+{
+  "key": "{{key}}",
+  "productSlug": "{{productSlug}}",
+  "instanceId": "{{instanceId}}",
+  "nonce": "{{$guid}}",
+  "timestamp": {{$timestamp}}
+}
+
+### Validate from a second instance (counts against MaxActivations)
+POST {{baseUrl}}/v1/licenses/validate
+Content-Type: application/json
+
+{
+  "key": "{{key}}",
+  "productSlug": "{{productSlug}}",
+  "instanceId": "local-server-02",
+  "nonce": "{{$guid}}",
+  "timestamp": {{$timestamp}}
+}
+
+### Unknown key: 200 with valid=false and reason=unknown_key (still signed)
+POST {{baseUrl}}/v1/licenses/validate
+Content-Type: application/json
+
+{
+  "key": "LH-0000-0000-0000-0000",
+  "productSlug": "{{productSlug}}",
+  "instanceId": "{{instanceId}}",
+  "nonce": "{{$guid}}",
+  "timestamp": {{$timestamp}}
+}
+
+### Stale timestamp: 400 (request.timestamp_out_of_window)
+POST {{baseUrl}}/v1/licenses/validate
+Content-Type: application/json
+
+{
+  "key": "{{key}}",
+  "productSlug": "{{productSlug}}",
+  "instanceId": "{{instanceId}}",
+  "nonce": "{{$guid}}",
+  "timestamp": 1700000000
+}
+
+### Deactivate: 204, or 404 when the key or instance is not active
+POST {{baseUrl}}/v1/licenses/deactivate
+Content-Type: application/json
+
+{
+  "key": "{{key}}",
+  "instanceId": "{{instanceId}}"
+}
+
+### OpenAPI document (Development only); the interactive UI is at {{baseUrl}}/scalar
+GET {{baseUrl}}/openapi/v1.json

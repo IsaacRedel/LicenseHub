@@ -6,12 +6,14 @@ using LicenseHub.Infrastructure.Persistence;
 using LicenseHub.Infrastructure.Signing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Scalar.AspNetCore;
 
 const string DatabaseHealthCheck = "database";
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
 
 // Development defaults to throwing on unreadable bodies, which the exception handler would turn into a 500.
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
@@ -57,6 +59,13 @@ if (useForwardedHeaders)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRateLimiter();
+
+// API reference only in Development: /openapi/v1.json and the Scalar UI at /scalar.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+}
 
 app.MapHealthChecks("/health");
 app.MapLicenseEndpoints();
