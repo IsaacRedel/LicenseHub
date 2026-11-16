@@ -1,6 +1,8 @@
+using LicenseHub.Api.Endpoints;
 using LicenseHub.Application;
 using LicenseHub.Infrastructure;
 using LicenseHub.Infrastructure.Persistence;
+using LicenseHub.Infrastructure.Signing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -8,8 +10,13 @@ const string DatabaseHealthCheck = "database";
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddProblemDetails();
+
+// Development defaults to throwing on unreadable bodies, which the exception handler would turn into a 500.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddResponseSigning(builder.Configuration, allowEphemeralKey: builder.Environment.IsDevelopment());
 builder.Services.AddHealthChecks().AddDbContextCheck<LicenseHubDbContext>(DatabaseHealthCheck);
 
 // CanConnectAsync goes through the retry strategy, so a down database would hang /health for
@@ -24,6 +31,13 @@ builder.Services.PostConfigure<HealthCheckServiceOptions>(options =>
 
 var app = builder.Build();
 
+if (app.Services.GetRequiredService<ResponseSigningKey>().IsEphemeral)
+{
+    app.Logger.LogWarning(
+        "Signing:PrivateKey is not configured; using an ephemeral signing key (keyId changes on every restart). " +
+        "Run the 'keygen' command to create a persistent key.");
+}
+
 // Off by default; docker-compose.yml turns it on so `docker compose up` gives a ready database.
 if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
@@ -31,6 +45,10 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
     await scope.ServiceProvider.GetRequiredService<LicenseHubDbContext>().Database.MigrateAsync();
 }
 
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
 app.MapHealthChecks("/health");
+app.MapLicenseEndpoints();
 
 await app.RunAsync();
