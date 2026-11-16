@@ -127,7 +127,8 @@ if (app.Environment.IsDevelopment())
 
 app.MapHealthChecks("/health");
 app.MapLicenseEndpoints();
-app.MapAdminEndpoints();
+app.MapAdminEndpoints()
+    .MapAdminProducts();
 
 await app.RunAsync();
 return 0;

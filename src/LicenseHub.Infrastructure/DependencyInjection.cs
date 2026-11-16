@@ -1,4 +1,5 @@
 using LicenseHub.Application.Abstractions;
+using LicenseHub.Application.Admins;
 using LicenseHub.Infrastructure.Auth;
 using LicenseHub.Infrastructure.Persistence;
 using LicenseHub.Infrastructure.Signing;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IActivationRepository, ActivationRepository>();
         services.AddScoped<IValidationLogRepository, ValidationLogRepository>();
         services.AddScoped<IAdminUserRepository, AdminUserRepository>();
+        services.AddScoped<IAdminQueries, AdminQueries>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddSingleton<IAdminPasswordHasher, AdminPasswordHasher>();
 
