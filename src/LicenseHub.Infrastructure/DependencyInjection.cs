@@ -1,5 +1,6 @@
 using LicenseHub.Application.Abstractions;
 using LicenseHub.Infrastructure.Persistence;
+using LicenseHub.Infrastructure.Signing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,42 @@ public static class DependencyInjection
         services.AddScoped<IValidationLogRepository, ValidationLogRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
+        return services;
+    }
+
+    public const string SigningKeySetting = "Signing:PrivateKey";
+
+    /// <summary>
+    /// Registers the response signing key from <c>Signing:PrivateKey</c>. When it is missing, an ephemeral
+    /// key is generated only if <paramref name="allowEphemeralKey"/> is true (Development); otherwise
+    /// startup fails.
+    /// </summary>
+    public static IServiceCollection AddResponseSigning(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool allowEphemeralKey)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var configuredKey = configuration[SigningKeySetting];
+        ResponseSigningKey key;
+        if (!string.IsNullOrWhiteSpace(configuredKey))
+        {
+            key = ResponseSigningKey.Load(configuredKey);
+        }
+        else if (allowEphemeralKey)
+        {
+            key = ResponseSigningKey.Generate(isEphemeral: true);
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"'{SigningKeySetting}' is not configured. Generate a key pair with the 'keygen' command " +
+                "and set it with user-secrets or the Signing__PrivateKey environment variable.");
+        }
+
+        services.AddSingleton(key);
+        services.AddSingleton<ValidationResponseSigner>();
         return services;
     }
 }

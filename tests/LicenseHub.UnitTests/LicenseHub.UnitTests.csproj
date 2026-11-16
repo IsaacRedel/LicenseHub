@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\LicenseHub.Domain\LicenseHub.Domain.csproj" />
     <ProjectReference Include="..\..\src\LicenseHub.Application\LicenseHub.Application.csproj" />
+    <ProjectReference Include="..\..\src\LicenseHub.Infrastructure\LicenseHub.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
