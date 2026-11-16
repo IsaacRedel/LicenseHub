@@ -120,8 +120,15 @@ O `payload` é o JSON abaixo codificado em base64url:
 
 ```json
 { "valid": true, "reason": null, "licenseId": "019a…", "expiresAt": null,
+  "productSlug": "demo", "keyFingerprint": "vnWY8h7rOBEVyrIY",
   "nonce": "…", "instanceId": "meu-servidor-01", "issuedAt": 1763300002 }
 ```
+
+- `productSlug`: o slug pedido, em minúsculas.
+- `keyFingerprint`: os 16 primeiros caracteres do base64url do SHA-256 da chave **exatamente como foi enviada** (UTF-8).
+- `instanceId`: o valor enviado, sem espaços nas pontas.
+
+Esses campos ligam a resposta ao pedido. Sem eles, um servidor falso poderia validar uma licença barata de outro produto e repassar a resposta assinada.
 
 | `reason` | Significado |
 | --- | --- |
@@ -144,12 +151,16 @@ O cliente precisa fazer, nesta ordem:
 
 1. Decodificar o `payload` de base64url para bytes.
 2. Verificar a `signature` (ES256 no formato IEEE P1363: `r || s`, 64 bytes) sobre **esses bytes**, com a chave pública **embutida no cliente**. Não confie numa chave baixada na hora do mesmo servidor, porque um servidor falso serviria a própria chave.
-3. Só então ler o JSON. Confira se `nonce` e `instanceId` são os que você enviou e se `issuedAt` é recente. Isso impede que uma resposta antiga seja reaproveitada.
+3. Só então ler o JSON. Confira:
+   - se `productSlug`, `keyFingerprint`, `nonce` e `instanceId` correspondem ao que você enviou;
+   - se `issuedAt` é recente.
+
+   Só depois disso confie em `valid`. Essas checagens impedem que uma resposta de outro pedido, de outro produto ou antiga seja reaproveitada.
 
 Node.js (servidor de um recurso FiveM, por exemplo):
 
 ```js
-const { createPublicKey, verify } = require('node:crypto');
+const { createHash, createPublicKey, verify } = require('node:crypto');
 
 const bytes = Buffer.from(response.payload, 'base64url');
 const ok = verify('sha256', bytes,
@@ -158,8 +169,13 @@ const ok = verify('sha256', bytes,
 if (!ok) throw new Error('Assinatura inválida');
 
 const result = JSON.parse(bytes.toString('utf8'));
-if (result.nonce !== sentNonce || result.instanceId !== instanceId) throw new Error('Resposta não corresponde ao pedido');
+const fingerprint = createHash('sha256').update(sentKey, 'utf8').digest('base64url').slice(0, 16);
+if (result.productSlug !== PRODUCT_SLUG || result.keyFingerprint !== fingerprint
+    || result.nonce !== sentNonce || result.instanceId !== instanceId) {
+  throw new Error('Resposta não corresponde ao pedido');
+}
 if (Math.abs(Date.now() / 1000 - result.issuedAt) > 300) throw new Error('Resposta antiga');
+// A partir daqui, result.valid e result.reason são confiáveis.
 ```
 
 C#:
@@ -171,6 +187,9 @@ publicKey.ImportFromPem(PublicKeyPem);
 var bytes = Base64Url.DecodeFromChars(response.Payload);
 var ok = publicKey.VerifyData(bytes, Base64Url.DecodeFromChars(response.Signature),
     HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+
+// Depois de verificar: compare productSlug, nonce, instanceId e o keyFingerprint abaixo com o pedido.
+var fingerprint = Base64Url.EncodeToString(SHA256.HashData(Encoding.UTF8.GetBytes(sentKey)))[..16];
 ```
 
 ### Proteções

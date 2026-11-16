@@ -1,3 +1,6 @@
+using System.Buffers.Text;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using LicenseHub.Application.Abstractions;
 using LicenseHub.Application.Common;
@@ -22,10 +25,16 @@ public sealed record ValidateLicenseCommand(
 /// The validation verdict to be signed and sent back. <see cref="LicenseId"/> and <see cref="ExpiresAt"/> are
 /// null when the key is unknown or belongs to another product.
 /// </summary>
+/// <param name="ProductSlug">The normalized slug the verdict is for, so a response for one product cannot
+/// be passed off as a response for another.</param>
+/// <param name="KeyFingerprint">Binds the verdict to the key the client sent (see
+/// <see cref="ValidateLicenseHandler.ComputeKeyFingerprint"/>), so a proxy cannot swap in its own key.</param>
 public sealed record LicenseValidation(
     ValidationOutcome Outcome,
     Guid? LicenseId,
     DateTimeOffset? ExpiresAt,
+    string ProductSlug,
+    string KeyFingerprint,
     string Nonce,
     string InstanceId,
     DateTimeOffset IssuedAt)
@@ -69,8 +78,23 @@ public sealed partial class ValidateLicenseHandler(
         // Do not reveal anything about a license that belongs to another product.
         var visible = outcome is ValidationOutcome.UnknownKey or ValidationOutcome.ProductMismatch ? null : license;
 
-        return new LicenseValidation(outcome, visible?.Id, visible?.ExpiresAt, nonce, instanceId, now);
+        return new LicenseValidation(
+            outcome,
+            visible?.Id,
+            visible?.ExpiresAt,
+            slug,
+            ComputeKeyFingerprint(command.Key!),
+            nonce,
+            instanceId,
+            now);
     }
+
+    /// <summary>
+    /// First 16 base64url characters of the SHA-256 of the key exactly as the client sent it (UTF-8, not
+    /// normalized), so the client can compare it with the hash of the string it sent.
+    /// </summary>
+    public static string ComputeKeyFingerprint(string key) =>
+        Base64Url.EncodeToString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..16];
 
     private async Task<(ValidationOutcome Outcome, License? License)> EvaluateAsync(
         string key,

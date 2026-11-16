@@ -58,7 +58,7 @@ LicenseHub/
    - A resposta é `{ payload, signature, keyId }`: `payload` é o JSON em base64url, e a assinatura cobre exatamente esses bytes, nunca um JSON re-serializado.
    - O `keyId` são os 16 primeiros caracteres do base64url do SHA-256 da chave pública, o que prepara a troca de chave.
    - A chave privada vem de configuração (`Signing:PrivateKey`), nunca do repositório.
-3. **Proteção contra replay.** O cliente manda um `nonce` e um timestamp, a resposta assinada devolve os dois, e o cliente rejeita respostas antigas ou repetidas. O servidor recusa com `400` um timestamp fora de ±5 minutos do seu relógio.
+3. **Proteção contra replay.** O cliente manda um `nonce` e um timestamp. A resposta assinada devolve o `nonce`, o horário de emissão (`issuedAt`), o produto e a impressão da chave, e o cliente rejeita respostas antigas, repetidas ou de outro pedido. O servidor recusa com `400` um timestamp fora de ±5 minutos do seu relógio.
 4. **Rate limiting** com o middleware nativo do ASP.NET Core, particionado por IP e mais rígido em `validate`/`deactivate`, para limitar tentativas de adivinhar chaves. O `X-Forwarded-For` só é aceito de proxies configurados.
 5. **Webhook idempotente.** O mesmo evento de pagamento chegando duas vezes gera uma licença só.
 6. **Ativações sem corrida.** A ativação roda numa transação que trava a linha da licença (`SELECT … FOR UPDATE`), então instâncias novas validando ao mesmo tempo nunca passam do máximo de ativações.
@@ -85,7 +85,9 @@ Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede qu
 - **Pedido:** `{ key, productSlug, instanceId, nonce, timestamp }`.
   - `nonce` tem de 16 a 128 caracteres base64url.
   - `timestamp` é em segundos Unix.
-- **Payload assinado:** `{ valid, reason, licenseId, expiresAt, nonce, instanceId, issuedAt }`, com datas em segundos Unix.
+- **Payload assinado:** `{ valid, reason, licenseId, expiresAt, productSlug, keyFingerprint, nonce, instanceId, issuedAt }`, com datas em segundos Unix.
+  - `productSlug` e `keyFingerprint` ligam a resposta ao produto e à chave do pedido. `keyFingerprint` são os 16 primeiros caracteres do base64url do SHA-256 da chave como foi enviada.
+  - Sem esses campos, um servidor falso poderia validar uma licença de outro produto repassando o nonce do cliente. O cliente deve comparar todos esses campos com o pedido antes de confiar em `valid`.
 - **Resultados de negócio:** voltam `200` com `valid=false` e um `reason`, também assinados.
   - Os valores de `reason` são `unknown_key`, `product_mismatch`, `revoked`, `expired` e `activation_limit_reached`.
   - Em `unknown_key` e `product_mismatch`, `licenseId` e `expiresAt` vêm nulos.

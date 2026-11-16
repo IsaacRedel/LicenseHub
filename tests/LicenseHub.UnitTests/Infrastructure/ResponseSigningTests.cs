@@ -75,7 +75,8 @@ public sealed class ResponseSigningTests : IDisposable
     {
         var licenseId = Guid.CreateVersion7(Now);
         var expiresAt = Now.AddDays(30);
-        var validation = new LicenseValidation(ValidationOutcome.Valid, licenseId, expiresAt, "nonce-0123456789abc", "srv-01", Now);
+        var validation = new LicenseValidation(
+            ValidationOutcome.Valid, licenseId, expiresAt, "fivem-garage", "fp-0123456789abc", "nonce-0123456789abc", "srv-01", Now);
 
         var json = Decode(_signer.Sign(validation));
 
@@ -83,6 +84,8 @@ public sealed class ResponseSigningTests : IDisposable
         Assert.Equal(JsonValueKind.Null, json.GetProperty("reason").ValueKind);
         Assert.Equal(licenseId, json.GetProperty("licenseId").GetGuid());
         Assert.Equal(expiresAt.ToUnixTimeSeconds(), json.GetProperty("expiresAt").GetInt64());
+        Assert.Equal("fivem-garage", json.GetProperty("productSlug").GetString());
+        Assert.Equal("fp-0123456789abc", json.GetProperty("keyFingerprint").GetString());
         Assert.Equal("nonce-0123456789abc", json.GetProperty("nonce").GetString());
         Assert.Equal("srv-01", json.GetProperty("instanceId").GetString());
         Assert.Equal(Now.ToUnixTimeSeconds(), json.GetProperty("issuedAt").GetInt64());
@@ -172,5 +175,13 @@ public sealed class ResponseSigningTests : IDisposable
         JsonDocument.Parse(Base64Url.DecodeFromChars(response.Payload)).RootElement;
 
     private static LicenseValidation NewValidation(ValidationOutcome outcome = ValidationOutcome.Valid) =>
-        new(outcome, outcome == ValidationOutcome.Valid ? Guid.CreateVersion7(Now) : null, null, "nonce-0123456789abc", "srv-01", Now);
+        new(
+            outcome,
+            outcome == ValidationOutcome.Valid ? Guid.CreateVersion7(Now) : null,
+            null,
+            "fivem-garage",
+            "fp-0123456789abc",
+            "nonce-0123456789abc",
+            "srv-01",
+            Now);
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using LicenseHub.Application.Licenses;
 using LicenseHub.Domain.Validation;
 using LicenseHub.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,8 @@ public sealed class ValidationFlowTests(MariaDbFixture database) : ApiTestBase(d
         Assert.Equal(license.Id, firstPayload.LicenseId);
         Assert.Equal(first.Nonce, firstPayload.Nonce);
         Assert.Equal("srv-01", firstPayload.InstanceId);
+        Assert.Equal(license.ProductSlug, firstPayload.ProductSlug);
+        Assert.Equal(ValidateLicenseHandler.ComputeKeyFingerprint(license.Key), firstPayload.KeyFingerprint);
         Assert.InRange(firstPayload.IssuedAt, first.Timestamp!.Value - 5, first.Timestamp.Value + 60);
 
         // Same instance again: still valid, no extra activation.

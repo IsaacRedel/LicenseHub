@@ -29,7 +29,9 @@ public static class LicenseEndpoints
             .WithDescription(
                 "Business results (unknown key, revoked, expired, activation limit) return 200 with valid=false " +
                 "and a reason, signed like a successful validation. The payload is base64url JSON; verify the " +
-                "ES256 signature (IEEE P1363) over the decoded bytes with the key from GET /v1/signing-key.")
+                "ES256 signature (IEEE P1363) over the decoded bytes with the public key embedded in the client " +
+                "(also served by GET /v1/signing-key), then check that productSlug, keyFingerprint, nonce and " +
+                "instanceId match the request before trusting valid.")
             .Produces<SignedResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status429TooManyRequests)

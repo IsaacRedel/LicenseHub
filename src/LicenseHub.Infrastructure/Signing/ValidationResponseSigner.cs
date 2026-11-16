@@ -12,12 +12,17 @@ namespace LicenseHub.Infrastructure.Signing;
 /// </summary>
 public sealed record SignedResponse(string Payload, string Signature, string KeyId);
 
-/// <summary>The signed validation verdict. Times are Unix seconds (UTC).</summary>
+/// <summary>
+/// The signed validation verdict. Times are Unix seconds (UTC). Clients must check that productSlug,
+/// keyFingerprint, nonce and instanceId match their own request before trusting valid.
+/// </summary>
 public sealed record ValidationPayload(
     [property: JsonPropertyName("valid")] bool Valid,
     [property: JsonPropertyName("reason")] string? Reason,
     [property: JsonPropertyName("licenseId")] Guid? LicenseId,
     [property: JsonPropertyName("expiresAt")] long? ExpiresAt,
+    [property: JsonPropertyName("productSlug")] string ProductSlug,
+    [property: JsonPropertyName("keyFingerprint")] string KeyFingerprint,
     [property: JsonPropertyName("nonce")] string Nonce,
     [property: JsonPropertyName("instanceId")] string InstanceId,
     [property: JsonPropertyName("issuedAt")] long IssuedAt)
@@ -36,6 +41,8 @@ public sealed record ValidationPayload(
             ReasonFor(validation.Outcome),
             validation.LicenseId,
             validation.ExpiresAt?.ToUnixTimeSeconds(),
+            validation.ProductSlug,
+            validation.KeyFingerprint,
             validation.Nonce,
             validation.InstanceId,
             validation.IssuedAt.ToUnixTimeSeconds());

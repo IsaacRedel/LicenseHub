@@ -45,6 +45,28 @@ public sealed class ValidateLicenseHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_BindsTheVerdictToTheRequestedProductAndKey()
+    {
+        var (_, key) = AddLicense();
+        var sentKey = $"  {key.ToLowerInvariant()}";
+
+        var valid = await Validate(sentKey, productSlug: "FiveM-Garage");
+        var mismatch = await Validate(sentKey, productSlug: "fivem-racing");
+
+        Assert.Equal("fivem-garage", valid.Value.ProductSlug);
+        Assert.Equal("fivem-racing", mismatch.Value.ProductSlug);
+        Assert.Equal(ValidateLicenseHandler.ComputeKeyFingerprint(sentKey), valid.Value.KeyFingerprint);
+        Assert.NotEqual(ValidateLicenseHandler.ComputeKeyFingerprint(key), valid.Value.KeyFingerprint);
+    }
+
+    [Fact]
+    public void ComputeKeyFingerprint_HashesTheKeyExactlyAsSent()
+    {
+        // Reference: printf ' lh-0123-4567-89ab-cdef' | openssl dgst -sha256 -binary | base64url | cut -c1-16
+        Assert.Equal("vnWY8h7rOBEVyrIY", ValidateLicenseHandler.ComputeKeyFingerprint(" lh-0123-4567-89ab-cdef"));
+    }
+
+    [Fact]
     public async Task HandleAsync_RefreshesInstanceThatIsAlreadyActive()
     {
         var (license, key) = AddLicense(maxActivations: 1);
