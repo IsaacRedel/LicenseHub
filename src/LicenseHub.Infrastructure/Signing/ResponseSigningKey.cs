@@ -23,6 +23,15 @@ public sealed class ResponseSigningKey : IDisposable
             throw new InvalidOperationException("The signing key must be an ECDSA P-256 key.");
         }
 
+        // ImportFromPem also accepts a PUBLIC KEY block; without this check the API would start and fail
+        // on every validation instead of at startup.
+        if (!HasPrivateKey(ecdsa))
+        {
+            ecdsa.Dispose();
+            throw new InvalidOperationException(
+                "Signing:PrivateKey holds a public key. Configure the private key printed by the 'keygen' command.");
+        }
+
         _ecdsa = ecdsa;
         IsEphemeral = isEphemeral;
         PublicKeyPem = ecdsa.ExportSubjectPublicKeyInfoPem();
@@ -101,6 +110,18 @@ public sealed class ResponseSigningKey : IDisposable
     }
 
     public void Dispose() => _ecdsa.Dispose();
+
+    private static bool HasPrivateKey(ECDsa ecdsa)
+    {
+        try
+        {
+            return ecdsa.ExportParameters(includePrivateParameters: true).D is { Length: > 0 };
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
+    }
 
     private static bool IsP256(ECDsa ecdsa)
     {

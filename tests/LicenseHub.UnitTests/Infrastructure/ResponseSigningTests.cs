@@ -151,6 +151,14 @@ public sealed class ResponseSigningTests : IDisposable
     }
 
     [Fact]
+    public void Load_RejectsAPublicKey()
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => ResponseSigningKey.Load(_key.PublicKeyPem));
+
+        Assert.Contains("public key", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_MarksEphemeralKeys()
     {
         using var ephemeral = ResponseSigningKey.Generate(isEphemeral: true);
