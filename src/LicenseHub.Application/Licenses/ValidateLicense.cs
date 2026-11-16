@@ -199,6 +199,7 @@ public sealed partial class ValidateLicenseHandler(
         return null;
     }
 
-    [GeneratedRegex("^[A-Za-z0-9_-]{16,128}$", RegexOptions.CultureInvariant)]
+    // \z, not $: in .NET, $ also matches before a trailing "\n".
+    [GeneratedRegex(@"^[A-Za-z0-9_-]{16,128}\z", RegexOptions.CultureInvariant)]
     private static partial Regex NoncePattern();
 }

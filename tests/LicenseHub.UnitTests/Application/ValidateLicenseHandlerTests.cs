@@ -205,6 +205,7 @@ public sealed class ValidateLicenseHandlerTests
     [InlineData("LH-0000-0000-0000-0000", "fivem-garage", " ", Nonce, "request.invalid_instance_id")]
     [InlineData("LH-0000-0000-0000-0000", "fivem-garage", "srv-01", "too-short", "request.invalid_nonce")]
     [InlineData("LH-0000-0000-0000-0000", "fivem-garage", "srv-01", "has spaces in the nonce", "request.invalid_nonce")]
+    [InlineData("LH-0000-0000-0000-0000", "fivem-garage", "srv-01", "AAAAAAAAAAAAAAAA\n", "request.invalid_nonce")]
     [InlineData("LH-0000-0000-0000-0000", "fivem-garage", "srv-01", null, "request.invalid_nonce")]
     public async Task HandleAsync_RejectsMalformedInput(string? key, string slug, string instanceId, string? nonce, string expectedCode)
     {
