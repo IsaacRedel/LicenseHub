@@ -50,15 +50,29 @@ public sealed class DeactivateLicenseHandler(
             return NotActive;
         }
 
-        var activation = await activations.FindAsync(license.Id, instanceId, cancellationToken);
-        if (activation is null)
-        {
-            return NotActive;
-        }
+        // Same row lock as validation: a concurrent validate (refreshing this instance) or a repeated
+        // deactivate waits instead of updating or deleting a row that is already gone.
+        var removed = await unitOfWork.ExecuteInTransactionAsync(
+            async ct =>
+            {
+                var locked = await licenses.GetForUpdateAsync(license.Id, ct);
+                if (locked is null)
+                {
+                    return false;
+                }
 
-        activations.Remove(activation);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+                var activation = await activations.FindAsync(locked.Id, instanceId, ct);
+                if (activation is null)
+                {
+                    return false;
+                }
 
-        return new DeactivatedInstance(license.Id, instanceId);
+                activations.Remove(activation);
+                await unitOfWork.SaveChangesAsync(ct);
+                return true;
+            },
+            cancellationToken);
+
+        return removed ? new DeactivatedInstance(license.Id, instanceId) : NotActive;
     }
 }

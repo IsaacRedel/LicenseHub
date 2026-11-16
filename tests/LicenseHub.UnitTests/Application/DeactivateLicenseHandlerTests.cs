@@ -36,6 +36,18 @@ public sealed class DeactivateLicenseHandlerTests
         Assert.Equal("srv-01", result.Value.InstanceId);
         Assert.Empty(_store.Activations);
         Assert.Equal(1, _store.SaveCount);
+        Assert.Equal(1, _store.TransactionCount);
+        Assert.Equal(1, _store.LockCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReturnsNotFoundWhenRepeated()
+    {
+        await Deactivate(_key, "srv-01");
+
+        var second = await Deactivate(_key, "srv-01");
+
+        Assert.Same(DeactivateLicenseHandler.NotActive, second.Error);
     }
 
     [Theory]
