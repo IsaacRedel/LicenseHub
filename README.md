@@ -30,6 +30,30 @@ O plano completo (arquitetura, modelo de dados, endpoints e decisões técnicas)
 - [ ] **Etapa 5 — Automação:** webhook de pagamento e expiração automática
 - [ ] **Etapa 6 — Vitrine:** clientes de exemplo (C# e FiveM) e release v1.0.0
 
+## 🚀 Como rodar
+
+Pré-requisitos: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) e [Docker](https://www.docker.com/products/docker-desktop/).
+
+```bash
+# 1. Configure as senhas locais (o .env não vai para o Git)
+cp .env.example .env
+
+# 2. Suba a API e o MariaDB
+docker compose up -d --build
+
+# 3. Confira a saúde da API
+curl http://localhost:8080/health
+```
+
+Para compilar e rodar os testes sem Docker:
+
+```bash
+dotnet build
+dotnet test
+```
+
+As portas ficam presas a `127.0.0.1`: API em `8080` e MariaDB em `3307`. As duas podem ser trocadas no `.env`.
+
 ## 📄 Licença
 
 [MIT](LICENSE)
