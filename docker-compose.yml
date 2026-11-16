@@ -32,8 +32,9 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__LicenseHub: "Server=mariadb;Port=3306;Database=${MARIADB_DATABASE:-licensehub};User ID=${MARIADB_USER:-licensehub};Password=${MARIADB_PASSWORD:?Set MARIADB_PASSWORD in .env (see .env.example)}"
       Database__ApplyMigrationsOnStartup: "true"
-      # Empty in Development means an ephemeral key; required in any other environment.
+      # Empty in Development means an ephemeral key; both are required in any other environment.
       Signing__PrivateKey: ${SIGNING_PRIVATE_KEY:-}
+      AdminAuth__JwtKey: ${ADMIN_JWT_KEY:-}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
 

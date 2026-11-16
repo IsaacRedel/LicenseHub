@@ -19,6 +19,17 @@ if (args is [KeygenCommand.Name, ..])
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Commands print their own result; keep framework and SQL logs out of the way. Added last, so these values
+// override the Logging section of appsettings.
+if (args is [SeedCommand.Name, ..] or [AdminCommand.Name, ..])
+{
+    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["Logging:LogLevel:Default"] = "Warning",
+        ["Logging:LogLevel:Microsoft.AspNetCore"] = "Warning",
+    });
+}
+
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
 {
     // Use-case errors already carry a code; a 400 without one comes from a body the binder could not read.
@@ -65,6 +76,11 @@ var app = builder.Build();
 if (args is [SeedCommand.Name, ..])
 {
     return await SeedCommand.RunAsync(app, Console.Out, Console.Error);
+}
+
+if (args is [AdminCommand.Name, ..])
+{
+    return await AdminCommand.RunAsync(app, args, Console.In, Console.Out, Console.Error);
 }
 
 if (app.Services.GetRequiredService<ResponseSigningKey>().IsEphemeral)
