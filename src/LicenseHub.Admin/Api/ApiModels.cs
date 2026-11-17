@@ -36,6 +36,24 @@ public sealed record StatsOverview(
     IReadOnlyList<DayValidations> Last30Days,
     IReadOnlyList<ProductUsage> Products);
 
+public sealed record ProductView(
+    Guid Id,
+    string Name,
+    string Slug,
+    int DefaultMaxActivations,
+    DateTimeOffset CreatedAt,
+    int LicenseCount);
+
+/// <summary>An RFC 9457 problem from the API, reduced to what the panel shows.</summary>
+/// <param name="Code">The API's stable error code, e.g. "product.slug_taken".</param>
+public sealed record ApiProblem(int Status, string? Code, string? Detail);
+
+/// <summary>Either the created resource or the problem the API answered.</summary>
+public sealed record ApiResult<T>(T? Value, ApiProblem? Problem)
+{
+    public bool IsSuccess => Problem is null;
+}
+
 /// <param name="Outcome">valid, unknownKey, productMismatch, revoked, expired or activationLimitReached.</param>
 public sealed record ValidationLogEntry(
     Guid Id,

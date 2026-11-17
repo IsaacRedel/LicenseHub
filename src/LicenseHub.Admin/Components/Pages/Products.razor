@@ -1,0 +1,149 @@
+@page "/produtos"
+@inherits AdminPageBase
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using LicenseHub.Admin.Dashboard
+@inject AdminApiClient Api
+@inject DashboardClock Clock
+
+<PageTitle>Produtos · LicenseHub</PageTitle>
+
+<PageHeader Crumb="LICENSEHUB / PRODUTOS" Title="PRODUTOS" />
+
+@if (ApiError is not null)
+{
+    <p class="form-error" role="alert">@ApiError</p>
+}
+
+<div class="row">
+    <Section Title="NOVO PRODUTO" Class="row__form">
+        <EditForm Model="_input" OnValidSubmit="CreateAsync" class="form" FormName="new-product">
+            <DataAnnotationsValidator />
+
+            <div class="field">
+                <label for="product-name" class="field__label">NOME</label>
+                <InputText id="product-name" class="field__input" @bind-Value="_input.Name" />
+                <ValidationMessage For="() => _input.Name" class="field__error" />
+            </div>
+
+            <div class="field">
+                <label for="product-slug" class="field__label">SLUG</label>
+                <InputText id="product-slug" class="field__input" @bind-Value="_input.Slug" aria-describedby="product-slug-hint" />
+                <p id="product-slug-hint" class="field__hint">Letras minúsculas, números e hífens. Os clientes enviam o slug, então ele não muda depois.</p>
+                <ValidationMessage For="() => _input.Slug" class="field__error" />
+            </div>
+
+            <div class="field">
+                <label for="product-max" class="field__label">LIMITE PADRÃO DE ATIVAÇÕES</label>
+                <InputNumber id="product-max" class="field__input" min="1" max="10000" @bind-Value="_input.DefaultMaxActivations" />
+                <ValidationMessage For="() => _input.DefaultMaxActivations" class="field__error" />
+            </div>
+
+            @if (_formError is not null)
+            {
+                <p class="form-error" role="alert">@_formError</p>
+            }
+
+            @if (_created is not null)
+            {
+                <p class="notice" role="status">Produto @_created cadastrado.</p>
+            }
+
+            <button type="submit" class="button-primary" disabled="@_saving">CADASTRAR</button>
+        </EditForm>
+    </Section>
+
+    <Section Title="PRODUTOS CADASTRADOS" Class="row__list">
+        @if (_products is null)
+        {
+            <p class="label" role="status">CARREGANDO…</p>
+        }
+        else if (_products.Count == 0)
+        {
+            <p class="empty">Nenhum produto cadastrado.</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">PRODUTO</th>
+                            <th scope="col" class="table__num">LIMITE PADRÃO</th>
+                            <th scope="col" class="table__num">LICENÇAS</th>
+                            <th scope="col">CRIADO EM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var product in _products)
+                        {
+                            <tr>
+                                <th scope="row">
+                                    <a class="table__strong" href="@($"/licencas?produto={product.Slug}")">@product.Name</a>
+                                    <span class="table__sub">@product.Slug</span>
+                                </th>
+                                <td class="table__num">@product.DefaultMaxActivations.ToString("N0", PtBr)</td>
+                                <td class="table__num">@product.LicenseCount.ToString("N0", PtBr)</td>
+                                <td>@Clock.DateTime(product.CreatedAt)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </Section>
+</div>
+
+@code {
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private ProductInput _input = new();
+    private IReadOnlyList<ProductView>? _products;
+    private string? _formError;
+    private string? _created;
+    private bool _saving;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task LoadAsync() => CallApiAsync(async () => _products = await Api.ListProductsAsync());
+
+    private async Task CreateAsync()
+    {
+        _saving = true;
+        _formError = null;
+        _created = null;
+
+        await CallApiAsync(async () =>
+        {
+            var result = await Api.CreateProductAsync(_input.Name!.Trim(), _input.Slug!.Trim(), _input.DefaultMaxActivations!.Value);
+            if (result.IsSuccess)
+            {
+                _created = result.Value!.Name;
+                _input = new ProductInput();
+                _products = await Api.ListProductsAsync();
+            }
+            else
+            {
+                _formError = Labels.Problem(result.Problem!, "Não foi possível cadastrar o produto.");
+            }
+        });
+
+        _saving = false;
+    }
+
+    private sealed class ProductInput
+    {
+        [Required(ErrorMessage = "Informe o nome.")]
+        [StringLength(100, ErrorMessage = "Use até 100 caracteres.")]
+        public string? Name { get; set; }
+
+        [Required(ErrorMessage = "Informe o slug.")]
+        [StringLength(64, ErrorMessage = "Use até 64 caracteres.")]
+        [RegularExpression("^[a-z0-9]+(-[a-z0-9]+)*$", ErrorMessage = "Use só letras minúsculas, números e hífens (ex.: meu-produto).")]
+        public string? Slug { get; set; }
+
+        [Required(ErrorMessage = "Informe o limite padrão.")]
+        [Range(1, 10_000, ErrorMessage = "O limite deve ficar entre 1 e 10.000.")]
+        public int? DefaultMaxActivations { get; set; } = 1;
+    }
+}

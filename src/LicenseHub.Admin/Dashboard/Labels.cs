@@ -26,6 +26,22 @@ public static class Labels
         _ => status.ToUpperInvariant(),
     };
 
+    /// <summary>A clear Portuguese message for an API error code; the API's own details are in English.</summary>
+    public static string Problem(Api.ApiProblem problem, string fallback) => problem.Code switch
+    {
+        "product.invalid_name" => "Informe um nome de até 100 caracteres.",
+        "product.invalid_slug" => "Use só letras minúsculas, números e hífens no slug (ex.: meu-produto).",
+        "product.invalid_max_activations" or "license.invalid_max_activations" =>
+            "O limite de ativações deve ficar entre 1 e 10.000.",
+        "product.slug_taken" => "Já existe um produto com este slug.",
+        "license.product_not_found" or "request.invalid_product_id" => "Escolha um produto.",
+        "license.invalid_customer_email" => "Informe um e-mail de cliente válido.",
+        "license.invalid_expiration" => "A validade precisa ser uma data futura.",
+        "license.invalid_revocation_reason" => "Informe o motivo da revogação (até 500 caracteres).",
+        "license.not_found" => "A licença não existe mais.",
+        _ => fallback,
+    };
+
     /// <summary>Short id for tables: the first 8 characters of a GUID.</summary>
     public static string ShortId(Guid? id) => id is { } value ? value.ToString()[..8].ToUpperInvariant() : "—";
 }
