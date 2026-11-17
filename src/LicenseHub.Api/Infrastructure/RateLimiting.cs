@@ -50,12 +50,13 @@ public static class RateLimiting
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = (context, cancellationToken) => WriteRejectionAsync(context, settings, cancellationToken);
 
-            // Partitioned by client IP. Behind a reverse proxy this is only the real client when the proxy is
-            // listed in ForwardedHeaders; otherwise every caller shares the proxy's address.
+            // Partitioned by client IP, except authenticated admin calls, which are partitioned by admin: they all
+            // arrive from the admin panel's address. Behind a reverse proxy the IP is only the real client when the
+            // proxy is listed in ForwardedHeaders; otherwise every caller shares the proxy's address.
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                 context.Request.Path.StartsWithSegments("/health")
                     ? RateLimitPartition.GetNoLimiter("health")
-                    : RateLimitPartition.GetFixedWindowLimiter(ClientKey(context), _ => new FixedWindowRateLimiterOptions
+                    : RateLimitPartition.GetFixedWindowLimiter(DefaultPartitionKey(context), _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = settings.Default.PermitLimit,
                         Window = TimeSpan.FromSeconds(settings.Default.WindowSeconds),
@@ -84,6 +85,17 @@ public static class RateLimiting
     }
 
     private static string ClientKey(HttpContext context) => PartitionKey(context.Connection.RemoteIpAddress);
+
+    /// <summary>
+    /// "admin:{sub}" for a request already authenticated with an admin token (authentication runs before the rate
+    /// limiter), otherwise the client IP partition.
+    /// </summary>
+    internal static string DefaultPartitionKey(HttpContext context) =>
+        context.Request.Path.StartsWithSegments("/admin")
+        && context.User.Identity?.IsAuthenticated == true
+        && context.User.FindFirst(Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value is { Length: > 0 } sub
+            ? $"admin:{sub}"
+            : ClientKey(context);
 
     /// <summary>
     /// The rate limit partition for an address. IPv6 clients usually control a whole /64, so they are grouped

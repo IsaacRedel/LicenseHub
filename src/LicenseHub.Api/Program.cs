@@ -120,8 +120,9 @@ if (useForwardedHeaders)
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-app.UseRateLimiter();
+// Authentication before the rate limiter, so admin calls are limited per admin rather than per panel IP.
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 // API reference only in Development: /openapi/v1.json and the Scalar UI at /scalar.
