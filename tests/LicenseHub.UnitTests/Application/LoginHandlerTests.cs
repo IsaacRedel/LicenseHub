@@ -89,6 +89,20 @@ public sealed class LoginHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_SpendsTheSameDatabaseWorkForEveryFailure()
+    {
+        await Login("nobody@example.com", Password);
+        var afterUnknown = (_store.TransactionCount, _store.AdminLockCount);
+
+        await Login("admin@example.com", "wrong password");
+        var afterWrong = (_store.TransactionCount, _store.AdminLockCount);
+
+        Assert.Equal((1, 1), afterUnknown);
+        Assert.Equal((2, 2), afterWrong);
+        Assert.Equal(1, _admin.FailedLoginCount);
+    }
+
+    [Fact]
     public async Task HandleAsync_ResetsTheFailureCountOnSuccess()
     {
         await Login("admin@example.com", "wrong password");

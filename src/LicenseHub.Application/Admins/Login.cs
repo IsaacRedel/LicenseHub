@@ -49,14 +49,18 @@ public sealed partial class LoginHandler(
         var admin = await FindAsync(command.Email, cancellationToken);
         var check = passwordHasher.Verify(admin?.PasswordHash, command.Password);
 
+        // Unknown email, locked-out account and wrong password all run the same locked transaction (the
+        // first two find nothing to count), so the database work does not tell the cases apart either.
         if (admin is null)
         {
+            await RecordFailureAsync(Guid.Empty, now, cancellationToken);
             return InvalidCredentials;
         }
 
         if (admin.IsLockedOut(now))
         {
             LogLockedOutAttempt(admin.Id, admin.LockoutEndsAt);
+            await RecordFailureAsync(admin.Id, now, cancellationToken);
             return InvalidCredentials;
         }
 
@@ -106,6 +110,7 @@ public sealed partial class LoginHandler(
     private async Task RecordFailureAsync(Guid adminId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         // Under a row lock: parallel wrong guesses must each count, or an attacker could exceed the limit.
+        // Guid.Empty matches no admin; it is used to spend the same database work for unknown emails.
         var lockedOut = await unitOfWork.ExecuteInTransactionAsync(
             async ct =>
             {
