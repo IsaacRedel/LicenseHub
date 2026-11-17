@@ -1,0 +1,118 @@
+/*
+ * Theme tokens (docs/DESIGN.md). Components only use var(--token).
+ *
+ * Without the lh-theme cookie the <html> has no data-theme: Arquivo is the default and the
+ * prefers-color-scheme media query switches to Tático, so no inline script is needed.
+ * With the cookie, the server writes data-theme on <html> and the page renders in that theme.
+ *
+ * Fonts: @fontsource 5.3.0 (latin subset, OFL-1.1, licenses next to the files in ../fonts).
+ */
+
+@font-face { font-family: "Jost"; src: url("../fonts/jost-300.woff2") format("woff2"); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "Jost"; src: url("../fonts/jost-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Jost"; src: url("../fonts/jost-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("../fonts/rajdhani-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("../fonts/rajdhani-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("../fonts/rajdhani-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Share Tech Mono"; src: url("../fonts/share-tech-mono-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+
+/* Arquivo (light): explicit choice, and the default when there is no cookie. */
+:root[data-theme="arquivo"],
+:root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #D9D3BE;
+    --side: #CFC9B2;
+    --panel: #E2DDC9;
+    --line: #8C8670;
+    --soft: #CFC9B2;
+    --ink: #2E2B24;
+    --strong: #2E2B24;
+    --muted: #55513F;
+    --primary: #3A372E;
+    --on-primary: #E4DFCB;
+    --refused: #9E3B32;
+    --danger: #9E3B32;
+    --rank-bg: #3A372E;
+    --rank-border: #3A372E;
+    --rank-ink: #E4DFCB;
+    --rank-accent: #E8836F;
+    --rank-on-bg: #E4DFCB;
+    --rank-on-ink: #2E2B24;
+    --rank-off-border: #8C8670;
+    --rank-off-ink: #CFC9B2;
+    --font-head: "Jost", "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", "Consolas", monospace;
+    --head-weight: 300;
+    --head-spacing: 0.16em;
+    --web: #8C8670;
+    --grid: rgba(85, 81, 63, 0.25);
+    --scanlines: 0;
+}
+
+/* Tático (dark): explicit choice. */
+:root[data-theme="tatico"] {
+    color-scheme: dark;
+    --bg: #070B08;
+    --side: #0A110C;
+    --panel: #0B140E;
+    --line: #1F3A2A;
+    --soft: #13261A;
+    --ink: #BFEFCB;
+    --strong: #DFFFE9;
+    --muted: #6F9C80;
+    --primary: #5BE38C;
+    --on-primary: #04170B;
+    --refused: #F2B23C;
+    --danger: #FF7A70;
+    --rank-bg: #160B0A;
+    --rank-border: #FF5A4F;
+    --rank-ink: #FFE1DD;
+    --rank-accent: #FF5A4F;
+    --rank-on-bg: #FF5A4F;
+    --rank-on-ink: #1A0503;
+    --rank-off-border: #5A2A26;
+    --rank-off-ink: #FFB3AC;
+    --font-head: "Rajdhani", "Segoe UI", sans-serif;
+    --font-mono: "Share Tech Mono", "Consolas", monospace;
+    --head-weight: 700;
+    --head-spacing: 0.10em;
+    --web: #5BE38C;
+    --grid: rgba(91, 227, 140, 0.12);
+    --scanlines: 1;
+}
+
+/* Tático (dark) when there is no cookie and the system prefers dark. Same values as above. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        color-scheme: dark;
+        --bg: #070B08;
+        --side: #0A110C;
+        --panel: #0B140E;
+        --line: #1F3A2A;
+        --soft: #13261A;
+        --ink: #BFEFCB;
+        --strong: #DFFFE9;
+        --muted: #6F9C80;
+        --primary: #5BE38C;
+        --on-primary: #04170B;
+        --refused: #F2B23C;
+        --danger: #FF7A70;
+        --rank-bg: #160B0A;
+        --rank-border: #FF5A4F;
+        --rank-ink: #FFE1DD;
+        --rank-accent: #FF5A4F;
+        --rank-on-bg: #FF5A4F;
+        --rank-on-ink: #1A0503;
+        --rank-off-border: #5A2A26;
+        --rank-off-ink: #FFB3AC;
+        --font-head: "Rajdhani", "Segoe UI", sans-serif;
+        --font-mono: "Share Tech Mono", "Consolas", monospace;
+        --head-weight: 700;
+        --head-spacing: 0.10em;
+        --web: #5BE38C;
+        --grid: rgba(91, 227, 140, 0.12);
+        --scanlines: 1;
+    }
+}

@@ -1,0 +1,60 @@
+@using LicenseHub.Admin.Theming
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<button type="button" class="theme-toggle" aria-label="@Themes.SwitchLabel(_theme)" @onclick="ToggleAsync">
+    <svg class="theme-toggle__icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+        <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1" />
+        <path d="M8 1.5 A6.5 6.5 0 0 1 8 14.5 Z" fill="currentColor" />
+    </svg>
+    <span>@Themes.Label(_theme)</span>
+</button>
+
+@code {
+    private IJSObjectReference? _module;
+    private string _theme = Themes.Arquivo;
+
+    /// <summary>The theme from the lh-theme cookie, read by the server; null when the system decides.</summary>
+    [Parameter]
+    public string? InitialTheme { get; set; }
+
+    protected override void OnInitialized() => _theme = InitialTheme ?? Themes.Arquivo;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // Without a cookie only the browser knows which theme the system preference picked.
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/theme.js");
+        var actual = await _module.InvokeAsync<string>("current");
+        if (actual != _theme)
+        {
+            _theme = actual;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/theme.js");
+        _theme = await _module.InvokeAsync<string>("toggle");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit is gone; nothing to release in the browser.
+            }
+        }
+    }
+}

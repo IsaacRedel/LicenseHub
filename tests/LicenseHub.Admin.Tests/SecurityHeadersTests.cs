@@ -28,6 +28,21 @@ public sealed class SecurityHeadersTests : IDisposable
         Assert.Equal("camera=(), microphone=(), geolocation=()", Header(response, "Permissions-Policy"));
     }
 
+    [Theory]
+    [InlineData("/app.css")]
+    [InlineData("/css/theme.css")]
+    [InlineData("/js/theme.js")]
+    [InlineData("/fonts/jost-300.woff2")]
+    [InlineData("/_framework/blazor.web.js")]
+    public async Task StaticFiles_AreServed(string path)
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     public void Policy_IsTheAgreedOne()
     {

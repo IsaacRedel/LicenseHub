@@ -1,5 +1,14 @@
 @inherits LayoutComponentBase
 
+<header class="topbar">
+    <ThemeToggle InitialTheme="@InitialTheme" />
+</header>
+
 <main class="content">
     @Body
 </main>
+
+@code {
+    [CascadingParameter(Name = "InitialTheme")]
+    private string? InitialTheme { get; set; }
+}

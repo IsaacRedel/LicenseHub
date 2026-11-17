@@ -1,11 +1,13 @@
+@using LicenseHub.Admin.Theming
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="@_theme">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["css/theme.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["LicenseHub.Admin.styles.css"]" />
     @* No <ImportMap />: it renders an inline script, which the Content-Security-Policy (script-src 'self') blocks. *@
@@ -13,9 +15,20 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="InteractiveServer" InitialTheme="@_theme" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
 </html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    // Null (no data-theme) lets the CSS follow the system preference; a saved choice renders without flicker.
+    private string? _theme;
+
+    protected override void OnInitialized() =>
+        _theme = Themes.FromCookie(HttpContext.Request.Cookies[Themes.CookieName]);
+}
