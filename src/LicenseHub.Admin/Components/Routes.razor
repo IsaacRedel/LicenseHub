@@ -1,7 +1,14 @@
 <CascadingValue Value="InitialTheme" Name="InitialTheme">
     <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
         <Found Context="routeData">
-            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            @* AuthorizeRouteView, not RouteView: [Authorize] must hold for navigation inside a circuit too, not only for
+               the first HTTP request (a circuit can open on an anonymous page such as /nao-encontrado). *@
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+                <Authorizing></Authorizing>
+            </AuthorizeRouteView>
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
     </Router>
