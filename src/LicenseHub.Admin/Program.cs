@@ -1,4 +1,5 @@
 using LicenseHub.Admin.Components;
+using LicenseHub.Admin.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,6 +7,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+// First, so every response gets the headers, including errors and static files.
+app.UseSecurityHeaders();
 
 if (!app.Environment.IsDevelopment())
 {
