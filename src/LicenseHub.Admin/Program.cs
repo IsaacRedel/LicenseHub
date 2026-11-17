@@ -7,14 +7,20 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.AddAdminAuthentication(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddAdminAuthentication(builder.Configuration);
 builder.Services.AddSingleton(services =>
     DashboardClock.FromConfiguration(builder.Configuration, services.GetRequiredService<TimeProvider>()));
+var useForwardedHeaders = builder.Services.AddTrustedForwardedHeaders(builder.Configuration);
 
 var app = builder.Build();
 
-// First, so every response gets the headers, including errors and static files.
+if (useForwardedHeaders)
+{
+    app.UseForwardedHeaders();
+}
+
+// Before everything else, so every response gets the headers, including errors and static files.
 app.UseSecurityHeaders();
 
 if (!app.Environment.IsDevelopment())
