@@ -26,7 +26,7 @@ O plano completo (arquitetura, modelo de dados, endpoints e decisões técnicas)
 - [x] **Etapa 1 — Domínio:** entidades, migrations e emissão de licenças
 - [x] **Etapa 2 — Validação:** resposta assinada (ECDSA), ativações, nonce e rate limit
 - [x] **Etapa 3 — Admin:** login com JWT, revogação e estatísticas
-- [ ] **Etapa 4 — Painel:** dashboard em Blazor
+- [x] **Etapa 4 — Painel:** dashboard em Blazor
 - [ ] **Etapa 5 — Automação:** webhook de pagamento e expiração automática
 - [ ] **Etapa 6 — Vitrine:** clientes de exemplo (C# e FiveM) e release v1.0.0
 
@@ -38,7 +38,7 @@ Pré-requisitos: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0
 # 1. Configure as senhas locais (o .env não vai para o Git)
 cp .env.example .env
 
-# 2. Suba a API e o MariaDB
+# 2. Suba a API, o painel e o MariaDB
 docker compose up -d --build
 
 # 3. Confira a saúde da API
@@ -50,7 +50,9 @@ docker compose run --rm api seed
 
 Em Development, a documentação interativa (Scalar) fica em <http://localhost:8080/scalar>, e o arquivo [`LicenseHub.Api.http`](src/LicenseHub.Api/LicenseHub.Api.http) tem exemplos de todas as chamadas.
 
-As portas ficam presas a `127.0.0.1`: API em `8080` e MariaDB em `3307`. As duas podem ser trocadas no `.env`.
+As portas ficam presas a `127.0.0.1`: API em `8080`, painel em `8081` e MariaDB em `3307`. Todas podem ser trocadas no `.env`.
+
+Se você já tinha subido o compose antes da etapa 4, rode `docker compose down` uma vez antes do `up`: a rede do compose passou a ter uma sub-rede fixa. Os volumes, e com eles o banco, são preservados.
 
 Para compilar e rodar os testes (os de integração sobem um MariaDB com Testcontainers, então o Docker precisa estar rodando):
 
@@ -127,7 +129,7 @@ curl -s http://localhost:8080/admin/auth/login \
 - **Validade:** o token vale 30 minutos e não há refresh token. Quando expirar, faça login de novo.
 - **Mensagem única:** email inexistente, senha errada e conta bloqueada recebem o mesmo `401`, para a resposta não revelar quais contas existem.
 - **Bloqueio:** 5 falhas seguidas bloqueiam a conta por 15 minutos.
-- **Rate limit:** o login aceita 5 tentativas por minuto por IP.
+- **Rate limit:** o login aceita 5 tentativas por minuto por IP. As demais rotas de admin aceitam 100 chamadas por minuto por admin.
 
 ### 3. Use o token
 
@@ -160,8 +162,54 @@ No Scalar (<http://localhost:8080/scalar>), faça o login e cole o `accessToken`
 | `POST /admin/licenses/{id}/revoke` | revoga com `{ "reason" }`; repetir não muda a revogação original |
 | `DELETE /admin/licenses/{id}/activations/{instanceId}` | libera uma vaga de ativação |
 | `GET /admin/stats` | licenças por status, validações por dia (30 dias) e produtos mais validados |
+| `GET /admin/stats/overview?tzOffsetMinutes=` | números do dashboard do painel; o "hoje" segue o deslocamento em relação ao UTC, em minutos (`-180` em Brasília; padrão `0`) |
+| `GET /admin/validations?limit=&licenseId=` | últimas validações (`limit` de 1 a 100, padrão 10), opcionalmente de uma licença |
 
 Na listagem, o `status` é o status efetivo: uma licença ativa com `expiresAt` vencido aparece como `expired`.
+
+## 🖥️ Painel de admin
+
+O painel (`src/LicenseHub.Admin`) é um Blazor Web App que conversa só com a API. Ele sobe junto com o `docker compose up -d --build`.
+
+1. Crie um admin com o `admin create` da seção anterior, se ainda não tiver um.
+2. Abra <http://127.0.0.1:8081> e entre com o email e a senha desse admin.
+
+| Tela | O que mostra |
+| --- | --- |
+| **Painel** | licenças ativas, validações de hoje, revogadas e expiradas; gráfico dos últimos 30 dias; rank do dia (de D a SSS, pela porcentagem de validações aceitas hoje); motivos de recusa; uso das ativações por produto e as 10 últimas validações |
+| **Licenças** | lista com filtro por produto e status e paginação; detalhe com ativações e histórico de validações; revogação com motivo obrigatório |
+| **Produtos** | lista e cadastro |
+| **+ EMITIR LICENÇA** | mostra a chave uma única vez, com botão de copiar; ao fechar o diálogo, a chave é descartada |
+
+O "hoje" e os horários seguem o fuso de `Dashboard:TimeZone` (`DASHBOARD_TIMEZONE` no `.env`, padrão `America/Sao_Paulo`).
+
+### Temas
+
+| Arquivo (claro) | Tático (escuro) |
+| --- | --- |
+| ![Painel no tema Arquivo](docs/img/painel-arquivo.png) | ![Painel no tema Tático](docs/img/painel-tatico.png) |
+
+O botão no topo troca o tema, e a escolha fica salva no navegador por um ano. Sem escolha salva, o painel segue o tema do sistema: claro abre no Arquivo, escuro abre no Tático. O guia visual completo está em [`docs/DESIGN.md`](docs/DESIGN.md).
+
+### Sessão e segurança
+
+- **O navegador nunca recebe o JWT.** O painel faz o login na API e guarda o token dentro do próprio cookie (`lh-admin`), criptografado pelo Data Protection. O cookie é HttpOnly, Secure e SameSite=Strict, e expira junto com o token (30 minutos, sem renovação).
+- **Sessão expirada:** quando o token vence ou a API responde `401`, o painel encerra a sessão e volta ao login com o aviso "Sessão expirada".
+- **HTTPS:** o cookie é Secure, e os navegadores só o aceitam sem HTTPS em `127.0.0.1` e `localhost`. Para expor o painel em outro endereço, coloque-o atrás de um proxy reverso com HTTPS.
+- **Chaves do Data Protection:** ficam no volume `admin-keys` (montado em `/keys`), então reiniciar o painel não derruba as sessões. O log avisa que essas chaves não são criptografadas em repouso; o volume deve ficar acessível só ao painel.
+- **Cabeçalhos:** CSP sem exceções (só scripts, estilos e fontes do próprio painel, sem nada inline), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` e `Permissions-Policy` bloqueando câmera, microfone e geolocalização.
+- **Rate limit do login:** o painel repassa à API o IP do navegador. A API só confia nesse cabeçalho quando ele vem do endereço fixo do painel na rede do compose (`172.30.89.10`), então o limite de 5 tentativas por minuto continua valendo por pessoa.
+- **Logs:** o painel nunca registra chaves de licença nem tokens.
+
+### Rodar sem Docker
+
+Com a API rodando em `http://localhost:8080`:
+
+```bash
+dotnet run --project src/LicenseHub.Admin
+```
+
+O painel abre em <http://127.0.0.1:5180>. O endereço da API vem de `LicenseHub:ApiBaseUrl`, e a pasta das chaves do Data Protection pode ser fixada em `DataProtection:KeysPath`; sem ela, o ASP.NET Core usa a pasta padrão do usuário.
 
 ## 🔐 Como validar uma licença
 

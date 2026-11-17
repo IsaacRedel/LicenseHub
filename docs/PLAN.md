@@ -14,7 +14,7 @@ O projeto usa .NET 10, a versão LTS com suporte até novembro de 2028 ([políti
 | --- | --- |
 | API | ASP.NET Core (.NET 10) |
 | Banco | EF Core + MariaDB, com migrations |
-| Painel | Blazor |
+| Painel | Blazor Web App (Interactive Server), com login no próprio servidor do painel |
 | Testes | xUnit + Testcontainers (MariaDB real nos testes de integração) |
 | Infra | Docker Compose (API + MariaDB + painel), GitHub Actions |
 | Documentação | OpenAPI com interface para testar os endpoints |
@@ -69,6 +69,21 @@ LicenseHub/
    - A senha usa só o `PasswordHasher` do ASP.NET Core (PBKDF2, salt aleatório, formato versionado). Tabelas, cookies e fluxos do Identity não fazem falta num painel com poucos admins.
    - Email inexistente, senha errada e conta bloqueada recebem a mesma resposta. Cinco falhas seguidas bloqueiam a conta por 15 minutos.
    - O login tem rate limit próprio, e não existe admin padrão: o primeiro é criado com o comando `admin create`.
+8. **Painel como BFF: o navegador nunca vê o JWT.**
+   - O login é uma página renderizada no servidor, com formulário e antiforgery. O painel chama a API e guarda o JWT como claim dentro do próprio cookie, criptografado pelo Data Protection.
+   - O cookie é HttpOnly, Secure e SameSite=Strict e expira junto com o JWT, sem renovação. As chaves do Data Protection ficam num volume, para a sessão sobreviver a um reinício.
+   - As telas usam Interactive Server com prerender desligado. Um `CircuitHandler` lê o token do usuário quando o circuito abre, e um `DelegatingHandler` o envia como `Bearer`, acessando os serviços do circuito pelo padrão `CircuitServicesAccessor` da documentação.
+   - Um `401` da API marca o token como expirado e leva a `/sessao-expirada`, que faz o `POST /logout` com antiforgery e volta ao login com "Sessão expirada".
+   - O painel mostra "Muitas tentativas" quando a API responde `429`. O bloqueio da conta continua indistinguível de senha errada, como na decisão 7.
+   - CSP sem exceções: o Blazor funcionou com `script-src 'self'` e `style-src 'self'`, sem scripts nem estilos inline. Por isso o painel não usa o `<ImportMap>` do template, e tamanhos dinâmicos ficam em atributos SVG.
+9. **Rate limit por admin e proxy confiável.**
+   - Chamadas autenticadas em `/admin/*` são limitadas por admin (`sub` do token), não por IP. Assim, todos os admins atrás do painel não dividem a mesma cota.
+   - No login, o painel repassa o IP do navegador em `X-Forwarded-For`. A API só aceita esse cabeçalho do IP fixo do painel numa sub-rede fixa do compose, então o limite de login continua por pessoa.
+10. **Dashboard calculado no banco, no fuso do painel.**
+    - `GET /admin/stats/overview` agrega no MariaDB os números do dia, os 30 dias, os motivos de recusa e o uso por produto. O dia do calendário segue `tzOffsetMinutes`, que o painel calcula a partir de `Dashboard:TimeZone` (padrão `America/Sao_Paulo`).
+    - `GET /admin/validations` devolve as últimas validações, também filtradas por licença no detalhe.
+    - O rank do dia (D, C, B, A, S, SSS) é calculado no painel por uma classe pura, com os limites numa constante. Sem validações no dia, mostra "—".
+    - O id curto exibido nas listas usa os 8 últimos dígitos do GUID. Os primeiros são o timestamp do GUID v7 e se repetiam entre licenças criadas no mesmo minuto.
 
 Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede quem edita o código do cliente.
 
@@ -90,6 +105,8 @@ Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede qu
 | `POST /admin/licenses/{id}/revoke` | JWT de admin | revoga uma licença com motivo (idempotente) |
 | `DELETE /admin/licenses/{id}/activations/{instanceId}` | JWT de admin | libera uma vaga de ativação |
 | `GET /admin/stats` | JWT de admin | licenças por status, validações por dia e produtos mais validados |
+| `GET /admin/stats/overview?tzOffsetMinutes=` | JWT de admin | números do dashboard do painel, com o dia no fuso informado |
+| `GET /admin/validations?limit=&licenseId=` | JWT de admin | últimas validações, opcionalmente de uma licença |
 | `POST /webhooks/payments` | assinatura do gateway | gera a licença quando o pagamento é aprovado |
 | `GET /health` | público | verificação de saúde |
 
@@ -112,15 +129,15 @@ Limite conhecido: licenciamento dificulta a pirataria casual, mas não impede qu
 
 Cada etapa termina com algo funcionando e publicado. A etapa 2 já é publicável: uma API pequena, assinada, testada e com CI.
 
-| # | Etapa | Entrega |
-| --- | --- | --- |
-| 0 | Base | Solução e projetos criados, Docker Compose com MariaDB, CI rodando o build |
-| 1 | Domínio | Entidades, migrations, emissão de licença e CRUD de produtos, com testes de unidade |
-| 2 | Validação | Validação com ativações, assinatura ECDSA, nonce, rate limit e testes de integração |
-| 3 | Admin | Login com JWT, revogação, listagem com paginação e estatísticas |
-| 4 | Painel | Blazor com dashboard, lista de licenças e botão de revogar |
-| 5 | Automação | Webhook do Mercado Pago em modo de teste e job que expira licenças vencidas |
-| 6 | Vitrine | Clientes de exemplo (C# e FiveM), README com diagrama, GIF e release v1.0.0 |
+| # | Etapa | Entrega | Status |
+| --- | --- | --- | --- |
+| 0 | Base | Solução e projetos criados, Docker Compose com MariaDB, CI rodando o build | concluída |
+| 1 | Domínio | Entidades, migrations, emissão de licença e CRUD de produtos, com testes de unidade | concluída |
+| 2 | Validação | Validação com ativações, assinatura ECDSA, nonce, rate limit e testes de integração | concluída |
+| 3 | Admin | Login com JWT, revogação, listagem com paginação e estatísticas | concluída |
+| 4 | Painel | Blazor com login próprio, dashboard, produtos, licenças, emissão e revogação, em dois temas | concluída |
+| 5 | Automação | Webhook do Mercado Pago em modo de teste e job que expira licenças vencidas | pendente |
+| 6 | Vitrine | Clientes de exemplo (C# e FiveM), README com diagrama, GIF e release v1.0.0 | pendente |
 
 ## Como testar
 
