@@ -1,0 +1,21 @@
+@page "/sessao-expirada"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Sessão expirada · LicenseHub</PageTitle>
+
+@* Ends the session with POST /logout (antiforgery), then /login shows "Sessão expirada".
+   js/session-expired.js submits the form at once; without JavaScript the button does it. *@
+<section class="login" aria-labelledby="expired-title">
+    <p class="label">LICENSEHUB · PAINEL DE ADMIN</p>
+    <h1 id="expired-title" class="page-title">SESSÃO EXPIRADA</h1>
+    <form id="session-expired-form" method="post" action="/logout" class="form">
+        <AntiforgeryToken />
+        <input type="hidden" name="reason" value="expired" />
+        <p>Sua sessão terminou. Entre de novo para continuar.</p>
+        <button type="submit" class="button-primary">ENTRAR DE NOVO</button>
+    </form>
+</section>
+
+<script src="js/session-expired.js"></script>

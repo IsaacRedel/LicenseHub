@@ -8,6 +8,11 @@
     @Body
 </main>
 
+<form method="post" action="/logout" class="logout-form">
+    <AntiforgeryToken />
+    <button type="submit" class="logout-button">SAIR</button>
+</form>
+
 @code {
     [CascadingParameter(Name = "InitialTheme")]
     private string? InitialTheme { get; set; }

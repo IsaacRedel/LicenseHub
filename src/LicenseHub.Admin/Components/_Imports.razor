@@ -1,9 +1,16 @@
 @using System.Net.Http
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
 @using Microsoft.JSInterop
 @using LicenseHub.Admin
+@using LicenseHub.Admin.Api
 @using LicenseHub.Admin.Components
 @using LicenseHub.Admin.Components.Layout
+@using LicenseHub.Admin.Components.Shared
+
+@* Every page requires a signed-in admin; /login and the error pages opt out with [AllowAnonymous]. *@
+@attribute [Authorize]

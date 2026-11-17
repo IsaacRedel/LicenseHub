@@ -1,0 +1,109 @@
+@page "/login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.ComponentModel.DataAnnotations
+@using LicenseHub.Admin.Auth
+@inject LoginApiClient LoginApi
+@inject NavigationManager Navigation
+
+<PageTitle>Entrar · LicenseHub</PageTitle>
+
+<section class="login" aria-labelledby="login-title">
+    <p class="label">LICENSEHUB · PAINEL DE ADMIN</p>
+    <h1 id="login-title" class="page-title">ENTRAR</h1>
+
+    @if (IsExpired && _error is null)
+    {
+        <p class="notice" role="status">Sessão expirada. Entre de novo para continuar.</p>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="form-error" role="alert">@_error</p>
+    }
+
+    <EditForm Model="Input" FormName="login" OnValidSubmit="SignInAsync" class="form" novalidate>
+        <DataAnnotationsValidator />
+
+        <div class="field">
+            <label for="login-email" class="field__label">USUÁRIO</label>
+            <InputText id="login-email" type="email" class="field__input" autocomplete="username" @bind-Value="Input.Email" />
+            <ValidationMessage For="() => Input.Email" class="field__error" />
+        </div>
+
+        <div class="field">
+            <label for="login-password" class="field__label">SENHA</label>
+            <InputText id="login-password" type="password" class="field__input" autocomplete="current-password" @bind-Value="Input.Password" />
+            <ValidationMessage For="() => Input.Password" class="field__error" />
+        </div>
+
+        <button type="submit" class="button-primary">ENTRAR</button>
+    </EditForm>
+</section>
+
+@code {
+    public const string InvalidCredentialsMessage = "Usuário ou senha inválidos";
+    public const string TooManyAttemptsMessage = "Muitas tentativas. Tente de novo mais tarde.";
+
+    private string? _error;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private LoginInput Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "expirada")]
+    private string? ExpiredFlag { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ReturnUrl")]
+    private string? ReturnUrl { get; set; }
+
+    private bool IsExpired => ExpiredFlag == "1";
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task SignInAsync()
+    {
+        var result = await LoginApi.LoginAsync(
+            Input.Email!.Trim(),
+            Input.Password!,
+            HttpContext.Connection.RemoteIpAddress,
+            HttpContext.RequestAborted);
+
+        // Never send the password back in the re-rendered form.
+        Input.Password = null;
+
+        switch (result.Outcome)
+        {
+            case LoginOutcome.Success:
+                await AdminAuthentication.SignInAsync(HttpContext, result.AccessToken!, result.ExpiresAt!.Value);
+                Navigation.NavigateTo(LocalReturnUrl(ReturnUrl));
+                break;
+            case LoginOutcome.TooManyAttempts:
+                _error = TooManyAttemptsMessage;
+                break;
+            case LoginOutcome.InvalidCredentials:
+                _error = InvalidCredentialsMessage;
+                break;
+            default:
+                _error = AdminPageBase.ApiErrorMessage;
+                break;
+        }
+    }
+
+    /// <summary>Only local paths, so the login cannot be used to redirect to another site.</summary>
+    private static string LocalReturnUrl(string? returnUrl) =>
+        returnUrl is { Length: > 1 } url && url[0] == '/' && url[1] is not ('/' or '\\') ? url : "/";
+
+    private sealed class LoginInput
+    {
+        [Required(ErrorMessage = "Informe o usuário.")]
+        [EmailAddress(ErrorMessage = "Informe um e-mail válido.")]
+        public string? Email { get; set; }
+
+        [Required(ErrorMessage = "Informe a senha.")]
+        public string? Password { get; set; }
+    }
+}

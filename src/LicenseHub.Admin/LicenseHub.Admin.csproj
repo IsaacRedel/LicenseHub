@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Reads the claims of the API's token (sub, email) without validating it: the API just issued it. -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="LicenseHub.Admin.Tests" />
   </ItemGroup>
 

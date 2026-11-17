@@ -11,11 +11,11 @@
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["LicenseHub.Admin.styles.css"]" />
     @* No <ImportMap />: it renders an inline script, which the Content-Security-Policy (script-src 'self') blocks. *@
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet @rendermode="PageRenderMode" />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" InitialTheme="@_theme" />
+    <Routes @rendermode="PageRenderMode" InitialTheme="@_theme" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
@@ -23,11 +23,21 @@
 </html>
 
 @code {
+    /// <summary>
+    /// Interactive Server without prerendering: API calls need the admin token, which only exists once the circuit
+    /// opens (prerendering would also call the API twice). Pages marked [ExcludeFromInteractiveRouting], such as
+    /// /login, stay static server-rendered.
+    /// </summary>
+    private static readonly IComponentRenderMode InteractiveServerWithoutPrerender = new InteractiveServerRenderMode(prerender: false);
+
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
     // Null (no data-theme) lets the CSS follow the system preference; a saved choice renders without flicker.
     private string? _theme;
+
+    private IComponentRenderMode? PageRenderMode =>
+        HttpContext.AcceptsInteractiveRouting() ? InteractiveServerWithoutPrerender : null;
 
     protected override void OnInitialized() =>
         _theme = Themes.FromCookie(HttpContext.Request.Cookies[Themes.CookieName]);

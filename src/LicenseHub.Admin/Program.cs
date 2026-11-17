@@ -1,3 +1,4 @@
+using LicenseHub.Admin.Auth;
 using LicenseHub.Admin.Components;
 using LicenseHub.Admin.Security;
 
@@ -5,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddAdminAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
@@ -17,9 +19,13 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/nao-encontrado", createScopeForStatusCodePages: true);
+
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapAdminLogout();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
