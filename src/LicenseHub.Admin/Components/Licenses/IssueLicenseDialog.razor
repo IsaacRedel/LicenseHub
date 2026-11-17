@@ -1,0 +1,203 @@
+@using System.ComponentModel.DataAnnotations
+@using LicenseHub.Admin.Auth
+@using LicenseHub.Admin.Dashboard
+@inject AdminApiClient Api
+@inject DashboardClock Clock
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<Modal Open="Open" Title="EMITIR LICENÇA" OnClose="CloseAsync">
+    @if (_issued is not null)
+    {
+        <div class="issued">
+            <p class="notice" role="status">Licença emitida para @_issued.CustomerEmail.</p>
+            <p class="label">CHAVE DA LICENÇA</p>
+            <output class="issued__key" id="issued-key">@_issued.Key</output>
+            <p class="issued__warning" role="alert"><span aria-hidden="true">▲ </span>Guarde esta chave agora. Ela não será exibida de novo.</p>
+            <div class="modal__actions">
+                <button type="button" class="button-secondary" @onclick="CopyAsync">@(_copied ? "COPIADA" : "COPIAR")</button>
+                <button type="button" class="button-primary" @onclick="CloseAsync">FECHAR</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <EditForm Model="_input" OnValidSubmit="IssueAsync" class="form" FormName="issue-license">
+            <DataAnnotationsValidator />
+
+            <div class="field">
+                <label for="issue-product" class="field__label">PRODUTO</label>
+                <InputSelect id="issue-product" class="field__input" @bind-Value="_input.ProductId">
+                    <option value="">Escolha um produto</option>
+                    @foreach (var product in _products)
+                    {
+                        <option value="@product.Id">@product.Name (@product.Slug)</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => _input.ProductId" class="field__error" />
+            </div>
+
+            <div class="field">
+                <label for="issue-email" class="field__label">E-MAIL DO CLIENTE</label>
+                <InputText id="issue-email" type="email" class="field__input" @bind-Value="_input.CustomerEmail" />
+                <ValidationMessage For="() => _input.CustomerEmail" class="field__error" />
+            </div>
+
+            <div class="field">
+                <label for="issue-max" class="field__label">MÁXIMO DE ATIVAÇÕES</label>
+                <InputNumber id="issue-max" class="field__input" min="1" max="10000" @bind-Value="_input.MaxActivations" aria-describedby="issue-max-hint" />
+                <p id="issue-max-hint" class="field__hint">Em branco, usa o limite padrão do produto.</p>
+                <ValidationMessage For="() => _input.MaxActivations" class="field__error" />
+            </div>
+
+            <div class="field">
+                <label for="issue-expires" class="field__label">VALIDADE</label>
+                <InputDate id="issue-expires" class="field__input" @bind-Value="_input.ExpiresOn" aria-describedby="issue-expires-hint" />
+                <p id="issue-expires-hint" class="field__hint">Em branco, a licença não expira. Vale até o fim do dia escolhido.</p>
+            </div>
+
+            @if (_error is not null)
+            {
+                <p class="form-error" role="alert">@_error</p>
+            }
+
+            <div class="modal__actions">
+                <button type="button" class="button-secondary" @onclick="CloseAsync">CANCELAR</button>
+                <button type="submit" class="button-primary" disabled="@_saving">EMITIR</button>
+            </div>
+        </EditForm>
+    }
+</Modal>
+
+@code {
+    private IssueInput _input = new();
+    private IReadOnlyList<ProductView> _products = [];
+    private IssuedLicense? _issued;
+    private string? _error;
+    private bool _saving;
+    private bool _copied;
+    private bool _loadedForThisOpening;
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>Raised after a license is issued, so the page can refresh its data.</summary>
+    [Parameter]
+    public EventCallback OnIssued { get; set; }
+
+    /// <summary>True while the key is held in this component (only between issuing and closing).</summary>
+    internal bool HoldsKey => _issued is not null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Open)
+        {
+            _loadedForThisOpening = false;
+            return;
+        }
+
+        if (!_loadedForThisOpening)
+        {
+            _loadedForThisOpening = true;
+            await RunAsync(async () => _products = await Api.ListProductsAsync());
+        }
+    }
+
+    private async Task IssueAsync()
+    {
+        _saving = true;
+        _error = null;
+
+        await RunAsync(async () =>
+        {
+            var result = await Api.IssueLicenseAsync(
+                _input.ProductId!.Value,
+                _input.CustomerEmail!.Trim(),
+                _input.MaxActivations,
+                EndOfDay(_input.ExpiresOn));
+
+            if (result.IsSuccess)
+            {
+                _issued = result.Value;
+                await OnIssued.InvokeAsync();
+            }
+            else
+            {
+                _error = Labels.Problem(result.Problem!, "Não foi possível emitir a licença.");
+            }
+        });
+
+        _saving = false;
+    }
+
+    private async Task CopyAsync()
+    {
+        if (_issued is null)
+        {
+            return;
+        }
+
+        await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/clipboard.js");
+        _copied = await module.InvokeAsync<bool>("copy", _issued.Key);
+        if (!_copied)
+        {
+            _error = "Não foi possível copiar. Selecione a chave e copie manualmente.";
+        }
+    }
+
+    /// <summary>Discards the key and the form, then tells the page the dialog closed.</summary>
+    private async Task CloseAsync()
+    {
+        _issued = null;
+        _copied = false;
+        _error = null;
+        _input = new IssueInput();
+        await OnClose.InvokeAsync();
+    }
+
+    private DateTimeOffset? EndOfDay(DateTime? day)
+    {
+        if (day is not { } date)
+        {
+            return null;
+        }
+
+        var local = date.Date.AddDays(1).AddTicks(-1);
+        return new DateTimeOffset(local, Clock.TimeZone.GetUtcOffset(local));
+    }
+
+    private async Task RunAsync(Func<Task> call)
+    {
+        try
+        {
+            await call();
+        }
+        catch (SessionExpiredException)
+        {
+            Navigation.NavigateTo(AdminAuthentication.SessionExpiredPath, forceLoad: true);
+        }
+        catch (HttpRequestException)
+        {
+            _error = AdminPageBase.ApiErrorMessage;
+        }
+    }
+
+    private sealed class IssueInput
+    {
+        [Required(ErrorMessage = "Escolha um produto.")]
+        public Guid? ProductId { get; set; }
+
+        [Required(ErrorMessage = "Informe o e-mail do cliente.")]
+        [EmailAddress(ErrorMessage = "Informe um e-mail válido.")]
+        [StringLength(254, ErrorMessage = "Use até 254 caracteres.")]
+        public string? CustomerEmail { get; set; }
+
+        [Range(1, 10_000, ErrorMessage = "O limite deve ficar entre 1 e 10.000.")]
+        public int? MaxActivations { get; set; }
+
+        public DateTime? ExpiresOn { get; set; }
+    }
+}

@@ -36,17 +36,25 @@ public sealed class FakeApi : HttpMessageHandler
 
     public string? IssuedToken { get; private set; }
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    /// <summary>Request bodies, read when received: HttpClient disposes the content once the call returns.</summary>
+    public Dictionary<HttpRequestMessage, string> Bodies { get; } = [];
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
         lock (Requests)
         {
             Requests.Add(request);
+            if (body is not null)
+            {
+                Bodies[request] = body;
+            }
         }
 
         var key = $"{request.Method} {request.RequestUri!.PathAndQuery}";
-        return Task.FromResult(_routes.TryGetValue(key, out var respond)
+        return _routes.TryGetValue(key, out var respond)
             ? respond(request)
-            : new HttpResponseMessage(HttpStatusCode.NotFound));
+            : new HttpResponseMessage(HttpStatusCode.NotFound);
     }
 
     public static string CreateToken(string email, DateTimeOffset expiresAt) =>

@@ -1,0 +1,59 @@
+@using System.ComponentModel.DataAnnotations
+
+<Modal Open="Open" Title="REVOGAR LICENÇA?" OnClose="CancelAsync">
+    <p class="modal__text">Revogar licença? Essa ação não pode ser desfeita.</p>
+    <EditForm Model="_input" OnValidSubmit="ConfirmAsync" class="form" FormName="revoke-license">
+        <DataAnnotationsValidator />
+
+        <div class="field">
+            <label for="revoke-reason" class="field__label">MOTIVO</label>
+            <InputTextArea id="revoke-reason" class="field__input field__input--area" rows="3" @bind-Value="_input.Reason" />
+            <ValidationMessage For="() => _input.Reason" class="field__error" />
+        </div>
+
+        @if (Error is not null)
+        {
+            <p class="form-error" role="alert">@Error</p>
+        }
+
+        <div class="modal__actions">
+            <button type="button" class="button-secondary" @onclick="CancelAsync">CANCELAR</button>
+            <button type="submit" class="button-danger" disabled="@Busy">REVOGAR</button>
+        </div>
+    </EditForm>
+</Modal>
+
+@code {
+    private ReasonInput _input = new();
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    /// <summary>Receives the reason; the page calls the API.</summary>
+    [Parameter]
+    public EventCallback<string> OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private async Task ConfirmAsync() => await OnConfirm.InvokeAsync(_input.Reason!.Trim());
+
+    private async Task CancelAsync()
+    {
+        _input = new ReasonInput();
+        await OnCancel.InvokeAsync();
+    }
+
+    private sealed class ReasonInput
+    {
+        [Required(ErrorMessage = "Informe o motivo.")]
+        [StringLength(500, ErrorMessage = "Use até 500 caracteres.")]
+        public string? Reason { get; set; }
+    }
+}

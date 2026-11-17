@@ -2,6 +2,7 @@
 @inherits AdminPageBase
 @using System.Globalization
 @using LicenseHub.Admin.Components.Dashboard
+@using LicenseHub.Admin.Components.Licenses
 @using LicenseHub.Admin.Dashboard
 @inject AdminApiClient Api
 @inject DashboardClock Clock
@@ -10,7 +11,10 @@
 
 <PageHeader Crumb="LICENSEHUB / PAINEL" Title="PAINEL">
     <button type="button" class="button-secondary" @onclick="LoadAsync" disabled="@_loading">ATUALIZAR</button>
+    <button type="button" class="button-primary" @onclick="() => _issuing = true">+ EMITIR LICENÇA</button>
 </PageHeader>
+
+<IssueLicenseDialog Open="_issuing" OnClose="() => _issuing = false" OnIssued="LoadAsync" />
 
 @if (ApiError is not null)
 {
@@ -133,6 +137,7 @@ else
     private IReadOnlyList<ValidationLogEntry> _log = [];
     private RankResult _rank = RankCalculator.Calculate(0, 0);
     private bool _loading;
+    private bool _issuing;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 

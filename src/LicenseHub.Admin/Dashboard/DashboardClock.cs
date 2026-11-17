@@ -25,6 +25,9 @@ public sealed class DashboardClock(TimeZoneInfo timeZone, TimeProvider timeProvi
     /// <summary>"16/11/2026 14:03" in the panel's time zone.</summary>
     public string DateTime(DateTimeOffset instant) => ToLocal(instant).ToString("dd/MM/yyyy HH:mm", PtBr);
 
+    /// <summary>"16/11/2026 14:03:27" in the panel's time zone.</summary>
+    public string FullDateTime(DateTimeOffset instant) => ToLocal(instant).ToString("dd/MM/yyyy HH:mm:ss", PtBr);
+
     public static DashboardClock FromConfiguration(IConfiguration configuration, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(configuration);

@@ -1,0 +1,195 @@
+@page "/licencas/{Id:guid}"
+@inherits AdminPageBase
+@using LicenseHub.Admin.Components.Licenses
+@using LicenseHub.Admin.Dashboard
+@inject AdminApiClient Api
+@inject DashboardClock Clock
+
+<PageTitle>Licença @Labels.ShortId(Id) · LicenseHub</PageTitle>
+
+<PageHeader Crumb="LICENSEHUB / LICENÇAS / DETALHE" Title="@($"LICENÇA {Labels.ShortId(Id)}")">
+    @if (_license is { Status: not "revoked" })
+    {
+        <button type="button" class="button-danger" @onclick="() => _revoking = true">REVOGAR</button>
+    }
+</PageHeader>
+
+@if (ApiError is not null)
+{
+    <p class="form-error" role="alert">@ApiError</p>
+}
+
+@if (_notFound)
+{
+    <p class="empty">Esta licença não existe. <a href="/licencas">Voltar às licenças</a></p>
+}
+else if (_license is null)
+{
+    <p class="label" role="status">CARREGANDO…</p>
+}
+else
+{
+    @if (_revokedNow)
+    {
+        <p class="notice" role="status">Licença revogada.</p>
+    }
+
+    <div class="row">
+        <Section Title="DADOS" Class="row__form">
+            <dl class="detail">
+                <dt>STATUS</dt>
+                <dd><StatusBadge Ok="@(_license.Status == "active")" Text="@Labels.LicenseStatus(_license.Status)" /></dd>
+                <dt>PRODUTO</dt>
+                <dd>@_license.ProductSlug</dd>
+                <dt>CLIENTE</dt>
+                <dd>@_license.CustomerEmail</dd>
+                <dt>ATIVAÇÕES</dt>
+                <dd>@_license.ActiveActivations / @_license.MaxActivations</dd>
+                <dt>VALIDADE</dt>
+                <dd>@(_license.ExpiresAt is { } expires ? Clock.DateTime(expires) : "Sem validade")</dd>
+                <dt>CRIADA EM</dt>
+                <dd>@Clock.DateTime(_license.CreatedAt)</dd>
+                <dt>INÍCIO DO HASH</dt>
+                <dd><code>@_license.KeyHashPrefix…</code></dd>
+                <dt>ID</dt>
+                <dd><code>@_license.Id</code></dd>
+            </dl>
+
+            @if (_license.Revocation is { } revocation)
+            {
+                <h3 class="label detail__subtitle">REVOGAÇÃO</h3>
+                <dl class="detail">
+                    <dt>EM</dt>
+                    <dd>@Clock.DateTime(revocation.RevokedAt)</dd>
+                    <dt>MOTIVO</dt>
+                    <dd>@(revocation.Reason ?? "—")</dd>
+                    <dt>POR</dt>
+                    <dd>@(revocation.RevokedBy?.Email ?? "—")</dd>
+                </dl>
+            }
+        </Section>
+
+        <Section Title="ATIVAÇÕES" Class="row__list">
+            @if (_license.Activations.Count == 0)
+            {
+                <p class="empty">Nenhuma instância ativa.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">INSTÂNCIA</th>
+                                <th scope="col">PRIMEIRA VALIDAÇÃO</th>
+                                <th scope="col">ÚLTIMA VALIDAÇÃO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var activation in _license.Activations)
+                            {
+                                <tr>
+                                    <th scope="row">@activation.InstanceId</th>
+                                    <td>@Clock.DateTime(activation.FirstValidatedAt)</td>
+                                    <td>@Clock.DateTime(activation.LastValidatedAt)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </Section>
+    </div>
+
+    <Section Title="HISTÓRICO DE VALIDAÇÕES">
+        @if (_history.Count == 0)
+        {
+            <p class="empty">Nenhuma validação registrada para esta licença.</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">HORÁRIO</th>
+                            <th scope="col">RESULTADO</th>
+                            <th scope="col">IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in _history)
+                        {
+                            <tr>
+                                <td>@Clock.FullDateTime(entry.CreatedAt)</td>
+                                <td><StatusBadge Ok="@(entry.Outcome == Labels.ValidOutcome)" Text="@Labels.Outcome(entry.Outcome)" /></td>
+                                <td>@(entry.IpAddress ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="label">ÚLTIMAS @HistoryLimit VALIDAÇÕES</p>
+        }
+    </Section>
+
+    <RevokeDialog Open="_revoking" Busy="_saving" Error="_revokeError" OnConfirm="RevokeAsync" OnCancel="CancelRevoke" />
+}
+
+@code {
+    public const int HistoryLimit = 50;
+
+    private LicenseDetails? _license;
+    private IReadOnlyList<ValidationLogEntry> _history = [];
+    private bool _notFound;
+    private bool _revoking;
+    private bool _revokedNow;
+    private bool _saving;
+    private string? _revokeError;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        await CallApiAsync(async () =>
+        {
+            var license = Api.GetLicenseAsync(Id);
+            var history = Api.GetValidationsAsync(HistoryLimit, Id);
+            _license = await license;
+            _history = await history;
+            _notFound = _license is null;
+        });
+    }
+
+    private async Task RevokeAsync(string reason)
+    {
+        _saving = true;
+        _revokeError = null;
+
+        await CallApiAsync(async () =>
+        {
+            var result = await Api.RevokeLicenseAsync(Id, reason);
+            if (result.IsSuccess)
+            {
+                _license = result.Value;
+                _revoking = false;
+                _revokedNow = true;
+            }
+            else
+            {
+                _revokeError = Labels.Problem(result.Problem!, "Não foi possível revogar a licença.");
+            }
+        });
+
+        _saving = false;
+    }
+
+    private void CancelRevoke()
+    {
+        _revoking = false;
+        _revokeError = null;
+    }
+}

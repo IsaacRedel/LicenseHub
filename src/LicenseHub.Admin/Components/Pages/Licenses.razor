@@ -1,0 +1,156 @@
+@page "/licencas"
+@inherits AdminPageBase
+@using System.Globalization
+@using LicenseHub.Admin.Components.Licenses
+@using LicenseHub.Admin.Dashboard
+@inject AdminApiClient Api
+@inject DashboardClock Clock
+@inject NavigationManager Navigation
+
+<PageTitle>Licenças · LicenseHub</PageTitle>
+
+<PageHeader Crumb="LICENSEHUB / LICENÇAS" Title="LICENÇAS">
+    <button type="button" class="button-primary" @onclick="() => _issuing = true">+ EMITIR LICENÇA</button>
+</PageHeader>
+
+@if (ApiError is not null)
+{
+    <p class="form-error" role="alert">@ApiError</p>
+}
+
+<Section Title="FILTROS">
+    <form class="filters" @onsubmit="ApplyFilters" @onsubmit:preventDefault>
+        <div class="field">
+            <label for="filter-product" class="field__label">PRODUTO</label>
+            <select id="filter-product" class="field__input" @bind="_productFilter">
+                <option value="">Todos</option>
+                @foreach (var product in _products)
+                {
+                    <option value="@product.Slug">@product.Name</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label for="filter-status" class="field__label">STATUS</label>
+            <select id="filter-status" class="field__input" @bind="_statusFilter">
+                <option value="">Todos</option>
+                <option value="ativa">Ativa</option>
+                <option value="revogada">Revogada</option>
+                <option value="expirada">Expirada</option>
+            </select>
+        </div>
+        <button type="submit" class="button-secondary">FILTRAR</button>
+    </form>
+</Section>
+
+<Section Title="LICENÇAS">
+    @if (_result is null)
+    {
+        <p class="label" role="status">CARREGANDO…</p>
+    }
+    else if (_result.Items.Count == 0)
+    {
+        <p class="empty">Nenhuma licença encontrada.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">LICENÇA</th>
+                        <th scope="col">PRODUTO</th>
+                        <th scope="col">CLIENTE</th>
+                        <th scope="col">STATUS</th>
+                        <th scope="col" class="table__num">ATIVAÇÕES</th>
+                        <th scope="col">VALIDADE</th>
+                        <th scope="col">CRIADA EM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var license in _result.Items)
+                    {
+                        <tr>
+                            <th scope="row"><a href="@($"/licencas/{license.Id}")">@Labels.ShortId(license.Id)</a></th>
+                            <td>@license.ProductSlug</td>
+                            <td>@license.CustomerEmail</td>
+                            <td><StatusBadge Ok="@(license.Status == "active")" Text="@Labels.LicenseStatus(license.Status)" /></td>
+                            <td class="table__num">@license.ActiveActivations / @license.MaxActivations</td>
+                            <td>@(license.ExpiresAt is { } expires ? Clock.DateTime(expires) : "Sem validade")</td>
+                            <td>@Clock.DateTime(license.CreatedAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="pager" aria-label="Paginação">
+            <button type="button" class="button-secondary" disabled="@(_result.Page <= 1)" @onclick="() => GoToPage(_result.Page - 1)">ANTERIOR</button>
+            <p class="label" role="status">PÁGINA @_result.Page DE @Math.Max(_result.TotalPages, 1) · @_result.TotalItems.ToString("N0", PtBr) LICENÇAS</p>
+            <button type="button" class="button-secondary" disabled="@(_result.Page >= _result.TotalPages)" @onclick="() => GoToPage(_result.Page + 1)">PRÓXIMA</button>
+        </nav>
+    }
+</Section>
+
+<IssueLicenseDialog Open="_issuing" OnClose="() => _issuing = false" OnIssued="LoadAsync" />
+
+@code {
+    public const int PageSize = 20;
+
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private static readonly Dictionary<string, string> StatusToApi = new(StringComparer.Ordinal)
+    {
+        ["ativa"] = "active",
+        ["revogada"] = "revoked",
+        ["expirada"] = "expired",
+    };
+
+    private IReadOnlyList<ProductView> _products = [];
+    private PagedResult<LicenseListItem>? _result;
+    private string _productFilter = string.Empty;
+    private string _statusFilter = string.Empty;
+    private bool _issuing;
+
+    [SupplyParameterFromQuery(Name = "produto")]
+    private string? Product { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    private string? Status { get; set; }
+
+    [SupplyParameterFromQuery(Name = "pagina")]
+    private int? Page { get; set; }
+
+    protected override async Task OnInitializedAsync() =>
+        await CallApiAsync(async () => _products = await Api.ListProductsAsync());
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _productFilter = Product ?? string.Empty;
+        _statusFilter = Status is { } status && StatusToApi.ContainsKey(status) ? status : string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _result = null;
+        await CallApiAsync(async () => _result = await Api.ListLicensesAsync(
+            StatusToApi.GetValueOrDefault(_statusFilter),
+            string.IsNullOrEmpty(_productFilter) ? null : _productFilter,
+            Math.Max(Page ?? 1, 1),
+            PageSize));
+    }
+
+    // Filters and page live in the URL, so a filtered list can be bookmarked or linked from Products.
+    private void ApplyFilters() => Navigate(1);
+
+    private void GoToPage(int page) => Navigate(page);
+
+    private void Navigate(int page) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["produto"] = string.IsNullOrEmpty(_productFilter) ? null : _productFilter,
+            ["status"] = string.IsNullOrEmpty(_statusFilter) ? null : _statusFilter,
+            ["pagina"] = page > 1 ? page : null,
+        }));
+}

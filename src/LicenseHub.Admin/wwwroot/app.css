@@ -837,3 +837,117 @@ button:disabled {
     background-color: var(--panel);
     border: 1px solid var(--line);
 }
+
+/* ---------- Dialogs ---------- */
+
+.modal {
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    padding: 24px 28px;
+    border: 1px solid var(--line);
+    background-color: var(--panel);
+    color: var(--ink);
+}
+
+.modal::backdrop {
+    background-color: var(--bg);
+    opacity: 0.85;
+}
+
+.modal__title {
+    margin: 0 0 16px;
+    font-family: var(--font-head);
+    font-size: 18px;
+    font-weight: var(--head-weight);
+    letter-spacing: var(--head-spacing);
+    color: var(--strong);
+}
+
+.modal__text {
+    margin: 0 0 16px;
+}
+
+.modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.field__input--area {
+    min-height: 88px;
+    resize: vertical;
+}
+
+/* The key is shown once, large and selectable. */
+.issued {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.issued__key {
+    display: block;
+    padding: 14px 16px;
+    border: 1px solid var(--primary);
+    background-color: var(--bg);
+    color: var(--strong);
+    font-family: var(--font-mono);
+    font-size: 20px;
+    letter-spacing: 0.06em;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.issued__warning {
+    margin: 0;
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+/* ---------- Licenses ---------- */
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+}
+
+.filters .field {
+    flex: 1 1 200px;
+}
+
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.detail {
+    display: grid;
+    grid-template-columns: minmax(120px, max-content) 1fr;
+    gap: 10px 16px;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.detail dt {
+    color: var(--muted);
+    letter-spacing: 0.08em;
+}
+
+.detail dd {
+    margin: 0;
+    color: var(--strong);
+    overflow-wrap: anywhere;
+}
+
+.detail__subtitle {
+    margin: 20px 0 10px;
+}

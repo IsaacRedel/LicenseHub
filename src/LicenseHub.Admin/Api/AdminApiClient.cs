@@ -43,6 +43,58 @@ public sealed partial class AdminApiClient(HttpClient http)
             new { name, slug, defaultMaxActivations },
             cancellationToken);
 
+    /// <param name="status">active, revoked or expired; null for any.</param>
+    public async Task<PagedResult<LicenseListItem>> ListLicensesAsync(
+        string? status,
+        string? productSlug,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = $"admin/licenses?page={page.ToString(CultureInfo.InvariantCulture)}&pageSize={pageSize.ToString(CultureInfo.InvariantCulture)}";
+        if (!string.IsNullOrEmpty(status))
+        {
+            query += $"&status={Uri.EscapeDataString(status)}";
+        }
+
+        if (!string.IsNullOrEmpty(productSlug))
+        {
+            query += $"&productSlug={Uri.EscapeDataString(productSlug)}";
+        }
+
+        return await GetAsync<PagedResult<LicenseListItem>>(query, cancellationToken);
+    }
+
+    /// <summary>The license, or null when it does not exist.</summary>
+    public async Task<LicenseDetails?> GetLicenseAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.GetAsync($"admin/licenses/{id}", cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<LicenseDetails>(cancellationToken);
+    }
+
+    /// <param name="maxActivations">Null uses the product default.</param>
+    /// <param name="expiresAt">Null issues a license that never expires.</param>
+    public Task<ApiResult<IssuedLicense>> IssueLicenseAsync(
+        Guid productId,
+        string customerEmail,
+        int? maxActivations,
+        DateTimeOffset? expiresAt,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<IssuedLicense>(
+            HttpMethod.Post,
+            "admin/licenses",
+            new { productId, customerEmail, maxActivations, expiresAt },
+            cancellationToken);
+
+    public Task<ApiResult<LicenseDetails>> RevokeLicenseAsync(Guid id, string reason, CancellationToken cancellationToken = default) =>
+        SendAsync<LicenseDetails>(HttpMethod.Post, $"admin/licenses/{id}/revoke", new { reason }, cancellationToken);
+
     /// <summary>Sends a JSON body; 4xx answers come back as <see cref="ApiProblem"/>, other failures throw.</summary>
     private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {

@@ -42,6 +42,9 @@ public static class Labels
         _ => fallback,
     };
 
-    /// <summary>Short id for tables: the first 8 characters of a GUID.</summary>
-    public static string ShortId(Guid? id) => id is { } value ? value.ToString()[..8].ToUpperInvariant() : "—";
+    /// <summary>
+    /// Short id for tables: the last 8 hex characters of a GUID. Ids are version 7, whose first characters are a
+    /// timestamp shared by everything created in the same minute; the end is random.
+    /// </summary>
+    public static string ShortId(Guid? id) => id is { } value ? value.ToString("N")[^8..].ToUpperInvariant() : "—";
 }

@@ -14,6 +14,8 @@ public sealed class AuthenticationTests : IDisposable
     [Theory]
     [InlineData("/")]
     [InlineData("/produtos")]
+    [InlineData("/licencas")]
+    [InlineData("/licencas/0199c1d2-0000-7000-8000-000000000001")]
     public async Task Pages_RedirectToLoginWithoutASession(string path)
     {
         using var browser = _factory.CreateBrowser();
