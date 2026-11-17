@@ -4,6 +4,9 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <!-- Local settings for `dotnet run` (API URL, keys path); never committed. -->
     <UserSecretsId>licensehub-admin-3c9b1e72</UserSecretsId>
+    <!-- The SDK adds the package with blazor.web.js only when it sees .razor files at restore time; the Dockerfile
+         restores from the project file alone, so without this the published image has no _framework scripts. -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>

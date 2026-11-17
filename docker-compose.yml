@@ -35,8 +35,40 @@ services:
       # Empty in Development means an ephemeral key; both are required in any other environment.
       Signing__PrivateKey: ${SIGNING_PRIVATE_KEY:-}
       AdminAuth__JwtKey: ${ADMIN_JWT_KEY:-}
+      # The panel relays logins with the browser's address in X-Forwarded-For; trust it only from the panel,
+      # so the login rate limit stays per person. Requests through the published port come from the gateway.
+      ForwardedHeaders__KnownProxies__0: 172.30.89.10
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
 
+  admin:
+    build:
+      context: .
+      dockerfile: src/LicenseHub.Admin/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      # Internal compose network; the API is not reached through the host.
+      LicenseHub__ApiBaseUrl: http://api:8080
+      DataProtection__KeysPath: /keys
+      Dashboard__TimeZone: ${DASHBOARD_TIMEZONE:-America/Sao_Paulo}
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-8081}:8080"
+    volumes:
+      - admin-keys:/keys
+    networks:
+      default:
+        ipv4_address: 172.30.89.10
+
+# Fixed subnet so the panel has a known address for the API's forwarded-headers trust.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.89.0/24
+
 volumes:
   mariadb-data:
+  admin-keys:
