@@ -63,22 +63,34 @@ internal static class AdminCommand
             return null;
         }
 
-        output.Write($"Password (min. {CreateAdminHandler.MinPasswordLength} characters): ");
-        var password = ReadHidden();
-        output.Write("Repeat the password: ");
-        var confirmation = ReadHidden();
-
-        if (password != confirmation)
+        output.WriteLine("Typing is not shown on screen.");
+        for (var attempt = 1; attempt <= MaxPromptAttempts; attempt++)
         {
-            error.WriteLine("The passwords do not match.");
-            return null;
+            output.Write($"Password (min. {CreateAdminHandler.MinPasswordLength} characters): ");
+            var password = ReadHidden(output);
+            output.Write("Repeat the password: ");
+            var confirmation = ReadHidden(output);
+
+            if (password == confirmation)
+            {
+                return password;
+            }
+
+            error.WriteLine("The passwords do not match. Try again.");
         }
 
-        return password;
+        error.WriteLine("Giving up after too many mismatches.");
+        return null;
     }
 
-    /// <summary>Reads a line from the console without echoing it.</summary>
-    private static string ReadHidden()
+    private const int MaxPromptAttempts = 3;
+
+    /// <summary>
+    /// Reads a line from the console without echoing it. An Enter on an empty line is ignored: terminals that
+    /// send Enter as "\r\n" (such as the Docker client on Windows) leave a "\n" that would otherwise end the next
+    /// prompt with an empty answer.
+    /// </summary>
+    private static string ReadHidden(TextWriter output)
     {
         var buffer = new StringBuilder();
         while (true)
@@ -86,7 +98,12 @@ internal static class AdminCommand
             var key = Console.ReadKey(intercept: true);
             if (key.Key == ConsoleKey.Enter)
             {
-                Console.WriteLine();
+                if (buffer.Length == 0)
+                {
+                    continue;
+                }
+
+                output.WriteLine();
                 return buffer.ToString();
             }
 
