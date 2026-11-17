@@ -93,6 +93,21 @@ public sealed class AdminLicenseTests(MariaDbFixture database) : ApiTestBase(dat
         Assert.True((await ReadVerifiedAsync(await PostValidateAsync(NewRequest(license.Key, license.ProductSlug, "srv-02")))).Valid);
     }
 
+    [Theory]
+    [InlineData("host%2Fvm1")]
+    [InlineData("host/vm1")]
+    public async Task ReleaseActivation_AcceptsInstanceIdsWithSlashes(string pathSegment)
+    {
+        using var admin = await CreateAdminClientAsync();
+        var license = await IssueLicenseAsync(maxActivations: 1);
+        Assert.True((await ReadVerifiedAsync(await PostValidateAsync(NewRequest(license.Key, license.ProductSlug, "host/vm1")))).Valid);
+
+        var released = await admin.DeleteAsync($"/admin/licenses/{license.Id}/activations/{pathSegment}", Token);
+
+        Assert.Equal(HttpStatusCode.NoContent, released.StatusCode);
+        Assert.Equal(0, await QueryAsync(db => db.Activations.CountAsync(a => a.LicenseId == license.Id, Token)));
+    }
+
     [Fact]
     public async Task List_PagesInAStableOrderAndFiltersByEffectiveStatusAndProduct()
     {

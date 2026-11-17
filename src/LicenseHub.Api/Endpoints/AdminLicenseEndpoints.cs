@@ -62,7 +62,8 @@ public static class AdminLicenseEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        licenses.MapDelete("/{id:guid}/activations/{instanceId}", ReleaseActivationAsync)
+        // Catch-all: instance ids may contain "/" (sent literally or as %2F).
+        licenses.MapDelete("/{id:guid}/activations/{**instanceId}", ReleaseActivationAsync)
             .WithName("AdminReleaseActivation")
             .WithSummary("Frees an activation slot so another instance can use the license.")
             .Produces(StatusCodes.Status204NoContent)
@@ -162,7 +163,10 @@ public static class AdminLicenseEndpoints
         ReleaseActivationHandler handler,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(new ReleaseActivationCommand(id, instanceId), cancellationToken);
+        // Kestrel decodes every escape in the path except %2F, which would never match the stored id.
+        var decoded = instanceId.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase);
+
+        var result = await handler.HandleAsync(new ReleaseActivationCommand(id, decoded), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : result.Error!.ToProblem();
     }
 
