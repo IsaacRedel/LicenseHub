@@ -99,7 +99,11 @@ public sealed class AdminLicenseHandlerTests
     [Theory]
     [InlineData("bogus", null, null, "request.invalid_status")]
     [InlineData("1", null, null, "request.invalid_status")]
+    [InlineData("active,revoked", null, null, "request.invalid_status")]
+    [InlineData("revoked, expired", null, null, "request.invalid_status")]
     [InlineData(null, 0, null, "request.invalid_page")]
+    [InlineData(null, int.MaxValue, 100, "request.invalid_page")]
+    [InlineData(null, ListLicensesHandler.MaxPage + 1, 1, "request.invalid_page")]
     [InlineData(null, null, 0, "request.invalid_page_size")]
     [InlineData(null, null, ListLicensesHandler.MaxPageSize + 1, "request.invalid_page_size")]
     public async Task List_RejectsInvalidParameters(string? status, int? page, int? pageSize, string expectedCode)

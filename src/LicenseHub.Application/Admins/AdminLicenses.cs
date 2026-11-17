@@ -23,6 +23,9 @@ public sealed class ListLicensesHandler(IAdminQueries queries, TimeProvider time
     public const int DefaultPageSize = 20;
     public const int MaxPageSize = 100;
 
+    /// <summary>Keeps (page - 1) * pageSize inside int for any page size.</summary>
+    public const int MaxPage = int.MaxValue / MaxPageSize;
+
     public async Task<Result<PagedResult<LicenseListItem>>> HandleAsync(ListLicensesQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -30,20 +33,25 @@ public sealed class ListLicensesHandler(IAdminQueries queries, TimeProvider time
         LicenseStatus? status = null;
         if (!string.IsNullOrWhiteSpace(query.Status))
         {
-            if (!Enum.TryParse<LicenseStatus>(query.Status.Trim(), ignoreCase: true, out var parsed)
-                || !Enum.IsDefined(parsed)
-                || int.TryParse(query.Status, out _))
+            // An explicit list: Enum.TryParse would also accept numbers and comma-separated names.
+            status = query.Status.Trim().ToLowerInvariant() switch
+            {
+                "active" => LicenseStatus.Active,
+                "revoked" => LicenseStatus.Revoked,
+                "expired" => LicenseStatus.Expired,
+                _ => null,
+            };
+
+            if (status is null)
             {
                 return new Error("request.invalid_status", "Status must be active, revoked or expired.", Field: "status");
             }
-
-            status = parsed;
         }
 
         var page = query.Page ?? 1;
-        if (page < 1)
+        if (page is < 1 or > MaxPage)
         {
-            return new Error("request.invalid_page", "Page must be 1 or greater.", Field: "page");
+            return new Error("request.invalid_page", $"Page must be between 1 and {MaxPage}.", Field: "page");
         }
 
         var pageSize = query.PageSize ?? DefaultPageSize;
