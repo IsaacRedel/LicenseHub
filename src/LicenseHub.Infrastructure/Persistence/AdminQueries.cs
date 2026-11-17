@@ -189,6 +189,125 @@ internal sealed class AdminQueries(LicenseHubDbContext db) : IAdminQueries
             top.Select(p => new ProductValidations(p.Id, p.Slug, p.Name, p.Validations)).ToList());
     }
 
+    public const int OverviewDays = 30;
+
+    public async Task<StatsOverview> GetOverviewAsync(DateTimeOffset now, int utcOffsetMinutes, CancellationToken cancellationToken)
+    {
+        var offset = TimeSpan.FromMinutes(utcOffsetMinutes);
+        var today = DateOnly.FromDateTime(now.ToOffset(offset).DateTime);
+        var firstDay = today.AddDays(-(OverviewDays - 1));
+        var sinceUtc = new DateTimeOffset(firstDay.ToDateTime(TimeOnly.MinValue), offset).UtcDateTime;
+
+        // CreatedAt is stored in UTC; shifting it by the offset before DATE() gives the local calendar day.
+        // Aggregated in the database and served by IX_validation_logs_CreatedAt_Outcome.
+        var rows = await db.Database
+            .SqlQuery<DailyOutcomeRow>($"""
+                SELECT DATE(DATE_ADD(CreatedAt, INTERVAL {utcOffsetMinutes} MINUTE)) AS Day, Outcome, COUNT(*) AS Total
+                FROM validation_logs
+                WHERE CreatedAt >= {sinceUtc}
+                GROUP BY Day, Outcome
+                """)
+            .ToListAsync(cancellationToken);
+
+        int Count(DateOnly day, ValidationOutcome? outcome = null) => (int)rows
+            .Where(r => DateOnly.FromDateTime(r.Day) == day && (outcome is null || r.Outcome == outcome.ToString()))
+            .Sum(r => r.Total);
+
+        var todayValidations = new TodayValidations(
+            today,
+            Count(today),
+            Count(today, ValidationOutcome.Valid),
+            Count(today, ValidationOutcome.UnknownKey),
+            Count(today, ValidationOutcome.ProductMismatch),
+            Count(today, ValidationOutcome.Revoked),
+            Count(today, ValidationOutcome.Expired),
+            Count(today, ValidationOutcome.ActivationLimitReached));
+
+        var last30Days = Enumerable.Range(0, OverviewDays)
+            .Select(i => firstDay.AddDays(i))
+            .Select(day =>
+            {
+                var accepted = Count(day, ValidationOutcome.Valid);
+                return new DayValidations(day, accepted, Count(day) - accepted);
+            })
+            .ToList();
+
+        var licenses = db.Licenses.AsNoTracking();
+        var active = licenses.Where(l => l.Status == LicenseStatus.Active && (l.ExpiresAt == null || l.ExpiresAt > now));
+        var kpis = new OverviewKpis(
+            await active.CountAsync(cancellationToken),
+            await licenses.CountAsync(l => l.Status == LicenseStatus.Revoked, cancellationToken),
+            await licenses.CountAsync(
+                l => l.Status == LicenseStatus.Expired
+                     || (l.Status == LicenseStatus.Active && l.ExpiresAt != null && l.ExpiresAt <= now),
+                cancellationToken),
+            todayValidations.Total);
+
+        // Three grouped queries merged in memory: one row per product, whatever the number of licenses.
+        var products = await db.Products.AsNoTracking()
+            .Select(p => new { p.Id, p.Name, p.Slug })
+            .ToListAsync(cancellationToken);
+        var licenseTotals = await active
+            .GroupBy(l => l.ProductId)
+            .Select(g => new { ProductId = g.Key, Count = g.Count(), Capacity = g.Sum(l => l.MaxActivations) })
+            .ToDictionaryAsync(x => x.ProductId, cancellationToken);
+        var activationTotals = await (from a in db.Activations.AsNoTracking()
+                                      join l in active on a.LicenseId equals l.Id
+                                      group a by l.ProductId into g
+                                      select new { ProductId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Count, cancellationToken);
+
+        var usage = products
+            .Select(p => new ProductUsage(
+                p.Id,
+                p.Name,
+                p.Slug,
+                licenseTotals.GetValueOrDefault(p.Id)?.Count ?? 0,
+                activationTotals.GetValueOrDefault(p.Id),
+                licenseTotals.GetValueOrDefault(p.Id)?.Capacity ?? 0))
+            .OrderByDescending(p => p.ActiveLicenses)
+            .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new StatsOverview(kpis, todayValidations, last30Days, usage);
+    }
+
+    public async Task<IReadOnlyList<ValidationLogView>> ListValidationsAsync(
+        int limit,
+        Guid? licenseId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+
+        var logs = db.ValidationLogs.AsNoTracking();
+        if (licenseId is { } id)
+        {
+            logs = logs.Where(v => v.LicenseId == id);
+        }
+
+        var rows = await logs
+            .OrderByDescending(v => v.CreatedAt)
+            .ThenByDescending(v => v.Id)
+            .Take(limit)
+            .Select(v => new
+            {
+                v.Id,
+                v.CreatedAt,
+                v.Outcome,
+                v.LicenseId,
+                v.IpAddress,
+                ProductSlug = (from l in db.Licenses
+                               where l.Id == v.LicenseId
+                               join p in db.Products on l.ProductId equals p.Id
+                               select p.Slug).FirstOrDefault(),
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new ValidationLogView(r.Id, r.CreatedAt, r.Outcome, r.LicenseId, r.ProductSlug, r.IpAddress))
+            .ToList();
+    }
+
     private sealed record DailyOutcomeRow(DateTime Day, string Outcome, long Total);
 
     private IQueryable<ProductView> ToViews(IQueryable<Product> products) =>

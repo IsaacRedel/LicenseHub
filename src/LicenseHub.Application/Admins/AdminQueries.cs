@@ -1,4 +1,5 @@
 using LicenseHub.Domain.Licenses;
+using LicenseHub.Domain.Validation;
 
 namespace LicenseHub.Application.Admins;
 
@@ -69,6 +70,47 @@ public sealed record AdminStats(
     IReadOnlyList<DailyValidations> ValidationsPerDay,
     IReadOnlyList<ProductValidations> TopProducts);
 
+public sealed record OverviewKpis(int ActiveLicenses, int RevokedLicenses, int ExpiredLicenses, int ValidationsToday);
+
+/// <summary>Today's validations (in the requested time zone), accepted and refused by reason.</summary>
+public sealed record TodayValidations(
+    DateOnly Date,
+    int Total,
+    int Accepted,
+    int UnknownKey,
+    int ProductMismatch,
+    int Revoked,
+    int Expired,
+    int ActivationLimitReached);
+
+public sealed record DayValidations(DateOnly Date, int Accepted, int Refused);
+
+/// <param name="ActivationsUsed">Activations of the product's active licenses.</param>
+/// <param name="ActivationCapacity">Sum of the activation limits of the product's active licenses.</param>
+public sealed record ProductUsage(
+    Guid ProductId,
+    string Name,
+    string Slug,
+    int ActiveLicenses,
+    int ActivationsUsed,
+    int ActivationCapacity);
+
+/// <summary>Everything the admin dashboard shows, aggregated in the database.</summary>
+public sealed record StatsOverview(
+    OverviewKpis Kpis,
+    TodayValidations Today,
+    IReadOnlyList<DayValidations> Last30Days,
+    IReadOnlyList<ProductUsage> Products);
+
+/// <param name="ProductSlug">Null when the key matched no license.</param>
+public sealed record ValidationLogView(
+    Guid Id,
+    DateTimeOffset CreatedAt,
+    ValidationOutcome Outcome,
+    Guid? LicenseId,
+    string? ProductSlug,
+    string? IpAddress);
+
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalItems, int TotalPages);
 
 /// <param name="Status">Effective status to filter by; null for any.</param>
@@ -94,4 +136,13 @@ public interface IAdminQueries
     /// (today included) and the <paramref name="topProducts"/> products with most validations in that period.
     /// </summary>
     Task<AdminStats> GetStatsAsync(DateTimeOffset now, int days, int topProducts, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Dashboard data. Days are calendar days at <paramref name="utcOffsetMinutes"/> from UTC; the last 30 days
+    /// include today and days without validations.
+    /// </summary>
+    Task<StatsOverview> GetOverviewAsync(DateTimeOffset now, int utcOffsetMinutes, CancellationToken cancellationToken);
+
+    /// <summary>Most recent validation attempts, newest first, optionally for one license.</summary>
+    Task<IReadOnlyList<ValidationLogView>> ListValidationsAsync(int limit, Guid? licenseId, CancellationToken cancellationToken);
 }
