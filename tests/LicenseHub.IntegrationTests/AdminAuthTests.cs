@@ -2,9 +2,12 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using LicenseHub.Domain.Admins;
 using LicenseHub.Infrastructure.Auth;
 using LicenseHub.IntegrationTests.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +26,43 @@ public sealed class AdminAuthTests(MariaDbFixture database) : ApiTestBase(databa
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
             Assert.Equal("auth.unauthorized", await ProblemCodeAsync(response));
         }
+    }
+
+    [Fact]
+    public async Task EveryAdminRouteExceptLogin_Returns401WithoutAToken()
+    {
+        var routes = Factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText is { } raw
+                        && raw.StartsWith("/admin", StringComparison.Ordinal)
+                        && raw != "/admin/auth/login")
+            .SelectMany(e => e.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods.Select(method => (method, e.RoutePattern.RawText!)))
+            .ToList();
+
+        Assert.True(routes.Count >= 10, $"Only {routes.Count} admin routes were discovered.");
+        foreach (var (method, pattern) in routes)
+        {
+            var path = Regex.Replace(pattern, @"\{[^}]+\}", m => m.Value.Contains("guid", StringComparison.Ordinal) ? Guid.NewGuid().ToString() : "srv-01");
+            using var request = new HttpRequestMessage(new HttpMethod(method), path)
+            {
+                Content = method is "POST" or "PATCH" ? JsonContent.Create(new { }) : null,
+            };
+
+            var response = await Client.SendAsync(request, Token);
+
+            Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, $"{method} {path} answered {(int)response.StatusCode}.");
+        }
+    }
+
+    [Fact]
+    public async Task ParallelWrongPasswords_EachCountTowardsTheLockout()
+    {
+        var email = await CreateAdminAsync();
+
+        await Task.WhenAll(Enumerable.Range(0, AdminUser.MaxFailedLogins).Select(_ => LoginAsync(email, "not the password at all")));
+
+        var admin = await QueryAsync(db => db.AdminUsers.SingleAsync(a => a.Email == email, Token));
+        Assert.True(admin.IsLockedOut(DateTimeOffset.UtcNow), "Parallel failures were lost instead of counted.");
     }
 
     [Fact]

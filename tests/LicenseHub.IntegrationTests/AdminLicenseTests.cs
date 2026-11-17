@@ -161,20 +161,23 @@ public sealed class AdminLicenseTests(MariaDbFixture database) : ApiTestBase(dat
         await PostValidateAsync(NewRequest(revoked.Key, revoked.ProductSlug, "srv-01"));
         await PostValidateAsync(NewRequest("LH-0000-0000-0000-0000", busy.ProductSlug, "srv-01"));
 
+        var dayBefore = DateOnly.FromDateTime(DateTime.UtcNow);
         var stats = await JsonAsync(await admin.GetAsync("/admin/stats", Token));
+        var dayAfter = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var byStatus = stats.GetProperty("licensesByStatus");
         Assert.Equal((1, 1, 0), (byStatus.GetProperty("active").GetInt32(), byStatus.GetProperty("revoked").GetInt32(), byStatus.GetProperty("expired").GetInt32()));
 
+        // Totals over the period instead of "today": the test may run across midnight UTC.
         var days = stats.GetProperty("validationsPerDay").EnumerateArray().ToList();
         Assert.Equal(30, days.Count);
-        var today = days[^1];
-        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), DateOnly.Parse(today.GetProperty("date").GetString()!, System.Globalization.CultureInfo.InvariantCulture));
+        var lastDay = DateOnly.Parse(days[^1].GetProperty("date").GetString()!, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Contains(lastDay, new[] { dayBefore, dayAfter });
+        int Total(string outcome) => days.Sum(d => d.GetProperty(outcome).GetInt32());
         Assert.Equal(
             (2, 1, 1, 1, 0, 0),
-            (today.GetProperty("valid").GetInt32(), today.GetProperty("activationLimitReached").GetInt32(), today.GetProperty("revoked").GetInt32(),
-             today.GetProperty("unknownKey").GetInt32(), today.GetProperty("expired").GetInt32(), today.GetProperty("productMismatch").GetInt32()));
-        Assert.All(days.SkipLast(1), d => Assert.Equal(0, d.GetProperty("valid").GetInt32()));
+            (Total("valid"), Total("activationLimitReached"), Total("revoked"), Total("unknownKey"), Total("expired"), Total("productMismatch")));
+        Assert.All(days.SkipLast(2), d => Assert.Equal(0, d.GetProperty("valid").GetInt32()));
 
         var top = stats.GetProperty("topProducts").EnumerateArray().ToList();
         Assert.Equal((busy.ProductSlug, 3), (top[0].GetProperty("slug").GetString(), top[0].GetProperty("validations").GetInt32()));
