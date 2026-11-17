@@ -1,0 +1,115 @@
+@using System.Globalization
+@using LicenseHub.Admin.Api
+
+@*  Stacked bars, accepted at the bottom (--primary) and refused on top (--refused): 210px tall, grid every 50px,
+    a dd/mm label every 5 days and a tooltip per bar. Sizes are SVG attributes (the CSP forbids style="").
+    The SVG is hidden from screen readers; the figure's aria-label and the table carry the same data. *@
+<figure class="chart" aria-label="@Summary">
+    <svg class="chart__svg" viewBox="0 0 @Width @Height" aria-hidden="true" focusable="false">
+        @for (var line = 1; line <= GridLines; line++)
+        {
+            var y = Baseline - line * GridStep;
+            <g>
+                <line class="chart__grid" x1="@Num(Gutter)" y1="@Num(y)" x2="@Num(Width)" y2="@Num(y)" />
+                <text class="chart__axis" x="@Num(Gutter - 6)" y="@Num(y + 4)" text-anchor="end">@((ScaleMax / GridLines * line).ToString("N0", PtBr))</text>
+            </g>
+        }
+
+        @for (var i = 0; i < Days.Count; i++)
+        {
+            var day = Days[i];
+            var x = Gutter + i * Slot + (Slot - BarWidth) / 2;
+            var acceptedHeight = Scale(day.Accepted);
+            var refusedHeight = Scale(day.Refused);
+            <g class="chart__bar">
+                <title>@($"{day.Date.ToString("dd/MM", PtBr)}: {day.Accepted.ToString("N0", PtBr)} aceitas, {day.Refused.ToString("N0", PtBr)} recusadas")</title>
+                <rect class="chart__hit" x="@Num(Gutter + i * Slot)" y="@Num(PlotTop)" width="@Num(Slot)" height="@Num(PlotHeight)" />
+                @if (acceptedHeight > 0)
+                {
+                    <rect class="chart__accepted" x="@Num(x)" y="@Num(Baseline - acceptedHeight)" width="@Num(BarWidth)" height="@Num(acceptedHeight)" />
+                }
+                @if (refusedHeight > 0)
+                {
+                    <rect class="chart__refused" x="@Num(x)" y="@Num(Baseline - acceptedHeight - refusedHeight)" width="@Num(BarWidth)" height="@Num(refusedHeight)" />
+                }
+            </g>
+            @if ((Days.Count - 1 - i) % 5 == 0)
+            {
+                <g>
+                    <text class="chart__axis" x="@Num(Gutter + i * Slot + Slot / 2)" y="@Num(Baseline + 18)" text-anchor="middle">@day.Date.ToString("dd/MM", PtBr)</text>
+                </g>
+            }
+        }
+
+        <line class="chart__base" x1="@Num(Gutter)" y1="@Num(Baseline)" x2="@Num(Width)" y2="@Num(Baseline)" />
+    </svg>
+
+    <figcaption class="chart__legend">
+        <span class="legend legend--primary"><span class="legend__swatch" aria-hidden="true">■</span> ACEITAS</span>
+        <span class="legend legend--refused"><span class="legend__swatch" aria-hidden="true">■</span> RECUSADAS</span>
+    </figcaption>
+
+    @* A div, not the table, is hidden: tables ignore the 1px size and would still take layout height. *@
+    <div class="visually-hidden">
+    <table>
+        <caption>Validações por dia, últimos 30 dias</caption>
+        <thead>
+            <tr><th scope="col">Dia</th><th scope="col">Aceitas</th><th scope="col">Recusadas</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var day in Days)
+            {
+                <tr>
+                    <th scope="row">@day.Date.ToString("dd/MM/yyyy", PtBr)</th>
+                    <td>@day.Accepted.ToString("N0", PtBr)</td>
+                    <td>@day.Refused.ToString("N0", PtBr)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+</figure>
+
+@code {
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private const double Width = 640;
+    private const double Gutter = 40;
+    private const double PlotTop = 8;
+    private const double PlotHeight = 210;
+    private const double GridStep = 50;
+    private const int GridLines = 4;
+    private const double Height = PlotTop + PlotHeight + 26;
+    private const double Baseline = PlotTop + PlotHeight;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DayValidations> Days { get; set; } = [];
+
+    /// <summary>Room on the right so the last date label is not cut.</summary>
+    private const double RightPad = 18;
+
+    private double Slot => (Width - Gutter - RightPad) / Math.Max(Days.Count, 1);
+
+    private double BarWidth => Slot * 0.62;
+
+    /// <summary>Value at the top grid line (200px): a multiple of 4 so every grid line is a whole number.</summary>
+    private int ScaleMax => Math.Max(GridLines, (int)Math.Ceiling(Days.DefaultIfEmpty().Max(d => d?.Total ?? 0) / (double)GridLines) * GridLines);
+
+    private double Scale(int value) => value <= 0 ? 0 : value * (GridStep * GridLines) / ScaleMax;
+
+    private string Summary
+    {
+        get
+        {
+            var accepted = Days.Sum(d => d.Accepted);
+            var refused = Days.Sum(d => d.Refused);
+            var busiest = Days.OrderByDescending(d => d.Total).FirstOrDefault();
+            var peak = busiest is { Total: > 0 }
+                ? $" Maior volume em {busiest.Date.ToString("dd/MM", PtBr)}, com {busiest.Total.ToString("N0", PtBr)} validações."
+                : string.Empty;
+            return $"Validações nos últimos 30 dias: {accepted.ToString("N0", PtBr)} aceitas e {refused.ToString("N0", PtBr)} recusadas.{peak}";
+        }
+    }
+
+    private static string Num(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}

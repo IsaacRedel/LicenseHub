@@ -1,0 +1,32 @@
+@using LicenseHub.Admin.Dashboard
+
+<section class="rank" aria-labelledby="rank-title">
+    <h2 class="section-title rank__title" id="rank-title"><span aria-hidden="true">■ </span>RANK DO DIA</h2>
+    <div class="rank__body">
+        <p class="rank__letter" aria-hidden="@(Result.HasData ? null : "true")">@Result.Rank</p>
+        <p class="rank__text">
+            @if (Result.HasData)
+            {
+                <span class="visually-hidden">Rank @Result.Rank. </span>
+                <strong>@Result.PercentText</strong>
+                <text> das validações foram aceitas hoje</text>
+            }
+            else
+            {
+                <text>Nenhuma validação hoje</text>
+            }
+        </p>
+    </div>
+    <ol class="rank__ladder" aria-label="Escada de rank, de D a SSS">
+        @foreach (var step in RankCalculator.Ladder)
+        {
+            var current = step == Result.Rank;
+            <li class="@(current ? "rank__step rank__step--on" : "rank__step")" aria-current="@(current ? "true" : null)">@step</li>
+        }
+    </ol>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public RankResult Result { get; set; } = RankCalculator.Calculate(0, 0);
+}

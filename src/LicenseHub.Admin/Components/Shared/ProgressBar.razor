@@ -1,0 +1,26 @@
+@* Track --soft, fill in the meaning's color. Widths are SVG attributes: the CSP forbids style="" attributes.
+   Decorative: the value is always written next to the bar. *@
+<svg class="@($"progress progress--{Tone}")" width="100%" height="@Height" aria-hidden="true" focusable="false">
+    <rect class="progress__track" x="0" y="0" width="100%" height="@Height" />
+    <rect class="progress__fill" x="0" y="0" width="@Percent" height="@Height" />
+</svg>
+
+@code {
+    [Parameter]
+    public double Value { get; set; }
+
+    [Parameter]
+    public double Max { get; set; }
+
+    /// <summary>primary, refused or danger.</summary>
+    [Parameter]
+    public string Tone { get; set; } = "primary";
+
+    /// <summary>4px by default; 3px in the products table.</summary>
+    [Parameter]
+    public int Height { get; set; } = 4;
+
+    private string Percent => Max <= 0
+        ? "0%"
+        : $"{Math.Clamp(Value / Max * 100, 0, 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%";
+}

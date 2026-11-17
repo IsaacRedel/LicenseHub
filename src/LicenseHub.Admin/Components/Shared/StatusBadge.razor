@@ -1,0 +1,10 @@
+@* Status in tables: ■ for accepted/ok in --strong, ▲ for a problem in --danger. Never color alone. *@
+<span class="@(Ok ? "status status--ok" : "status status--problem")"><span class="status__symbol" aria-hidden="true">@(Ok ? "■" : "▲")</span> @Text</span>
+
+@code {
+    [Parameter]
+    public bool Ok { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+}

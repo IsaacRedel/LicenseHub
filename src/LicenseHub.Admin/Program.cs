@@ -1,5 +1,6 @@
 using LicenseHub.Admin.Auth;
 using LicenseHub.Admin.Components;
+using LicenseHub.Admin.Dashboard;
 using LicenseHub.Admin.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddAdminAuthentication(builder.Configuration);
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton(services =>
+    DashboardClock.FromConfiguration(builder.Configuration, services.GetRequiredService<TimeProvider>()));
 
 var app = builder.Build();
 

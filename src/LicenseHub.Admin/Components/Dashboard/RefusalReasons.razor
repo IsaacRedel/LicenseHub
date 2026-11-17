@@ -1,0 +1,43 @@
+@using System.Globalization
+@using LicenseHub.Admin.Api
+
+@if (Today.Refused == 0)
+{
+    <p class="empty">Nenhuma recusa hoje.</p>
+}
+else
+{
+    <ul class="reasons">
+        @foreach (var (label, count, tone) in Reasons)
+        {
+            <li class="reasons__item">
+                <div class="reasons__row">
+                    <span class="reasons__label">@label</span>
+                    <span class="reasons__value">@count.ToString("N0", PtBr) · @Share(count)</span>
+                </div>
+                <ProgressBar Value="count" Max="Today.Refused" Tone="@tone" />
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired]
+    public TodayValidations Today { get; set; } = default!;
+
+    private IEnumerable<(string Label, int Count, string Tone)> Reasons =>
+        new (string Label, int Count, string Tone)[]
+        {
+            ("CHAVE INEXISTENTE", Today.UnknownKey, "refused"),
+            ("LIMITE DE ATIVAÇÕES", Today.ActivationLimitReached, "refused"),
+            ("EXPIRADA", Today.Expired, "refused"),
+            ("PRODUTO ERRADO", Today.ProductMismatch, "refused"),
+            ("REVOGADA", Today.Revoked, "danger"),
+        }
+        .OrderByDescending(r => r.Count);
+
+    private string Share(int count) =>
+        ((double)count / Today.Refused).ToString("P0", PtBr);
+}

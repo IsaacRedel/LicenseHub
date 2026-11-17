@@ -328,3 +328,422 @@ h1[tabindex="-1"]:focus {
 .theme-toggle__icon {
     flex: none;
 }
+
+/* ---------- Buttons and messages ---------- */
+
+.button-primary,
+.button-secondary,
+.button-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 18px;
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Main button ("+ EMITIR LICENÇA"): --primary border, transparent background, --strong text. */
+.button-primary {
+    border: 1px solid var(--primary);
+    color: var(--strong);
+}
+
+.button-primary:hover {
+    background-color: var(--primary);
+    color: var(--on-primary);
+}
+
+.button-secondary {
+    border: 1px solid var(--line);
+    color: var(--muted);
+}
+
+.button-secondary:hover {
+    border-color: var(--strong);
+    color: var(--strong);
+}
+
+.button-danger {
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+.button-danger:hover {
+    background-color: var(--danger);
+    color: var(--panel);
+}
+
+button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.form-error {
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px solid var(--danger);
+    border-left-width: 3px;
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.notice {
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--refused);
+    color: var(--strong);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.empty {
+    margin: 0;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+/* ---------- Sections and dashboard grid ---------- */
+
+.section {
+    min-width: 0;
+    padding: 22px 24px;
+    background-color: var(--panel);
+    border: 1px solid var(--line);
+}
+
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.kpi {
+    padding: 18px 20px;
+    background-color: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--primary);
+}
+
+.kpi--danger {
+    border-left-color: var(--danger);
+}
+
+.kpi--refused {
+    border-left-color: var(--refused);
+}
+
+.kpi__value {
+    margin: 6px 0 0;
+    font-family: var(--font-mono);
+    font-size: 40px;
+    line-height: 1.1;
+    color: var(--strong);
+}
+
+.kpi--danger .kpi__value {
+    color: var(--danger);
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.row__chart {
+    flex: 2 1 560px;
+}
+
+.row__side {
+    flex: 1 1 280px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.row__products {
+    flex: 1 1 380px;
+}
+
+.row__log {
+    flex: 1.4 1 460px;
+}
+
+@media (max-width: 720px) {
+    .row__chart,
+    .row__side,
+    .row__products,
+    .row__log {
+        flex-basis: 100%;
+    }
+}
+
+/* ---------- Chart ---------- */
+
+.chart {
+    margin: 0;
+}
+
+.chart__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.chart__grid {
+    stroke: var(--grid);
+    stroke-width: 1;
+}
+
+.chart__base {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+
+.chart__accepted {
+    fill: var(--primary);
+}
+
+.chart__refused {
+    fill: var(--refused);
+}
+
+.chart__hit {
+    fill: transparent;
+}
+
+.chart__bar:hover .chart__hit {
+    fill: var(--soft);
+}
+
+.chart__axis {
+    fill: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.chart__legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+}
+
+.legend {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.legend--primary .legend__swatch {
+    color: var(--primary);
+}
+
+.legend--refused .legend__swatch {
+    color: var(--refused);
+}
+
+/* ---------- Rank card ---------- */
+
+.rank {
+    padding: 22px 24px;
+    background-color: var(--rank-bg);
+    border: 1px solid var(--rank-border);
+    color: var(--rank-ink);
+}
+
+.rank__title {
+    color: var(--rank-ink);
+}
+
+.rank__body {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.rank__letter {
+    margin: 0;
+    font-family: "Rajdhani", var(--font-head);
+    font-size: 104px;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 0.9;
+    color: var(--rank-accent);
+}
+
+.rank__text {
+    margin: 0;
+    font-family: var(--font-head);
+    font-size: 15px;
+    color: var(--rank-ink);
+}
+
+.rank__text strong {
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+.rank__ladder {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rank__step {
+    min-width: 40px;
+    padding: 2px 8px;
+    border: 1px solid var(--rank-off-border);
+    color: var(--rank-off-ink);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: center;
+}
+
+.rank__step--on {
+    background-color: var(--rank-on-bg);
+    border-color: var(--rank-on-bg);
+    color: var(--rank-on-ink);
+}
+
+/* ---------- Refusal reasons and progress bars ---------- */
+
+.reasons {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.reasons__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.reasons__label {
+    color: var(--ink);
+    letter-spacing: 0.06em;
+}
+
+.reasons__value {
+    color: var(--strong);
+}
+
+.progress {
+    display: block;
+}
+
+.progress__track {
+    fill: var(--soft);
+}
+
+.progress--primary .progress__fill {
+    fill: var(--primary);
+}
+
+.progress--refused .progress__fill {
+    fill: var(--refused);
+}
+
+.progress--danger .progress__fill {
+    fill: var(--danger);
+}
+
+/* ---------- Tables ---------- */
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.table th,
+.table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--soft);
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.table thead th {
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border-bottom-color: var(--line);
+}
+
+.table tbody th {
+    font-weight: 400;
+}
+
+.table__num {
+    text-align: right;
+}
+
+.table th.table__num,
+.table td.table__num {
+    text-align: right;
+}
+
+.table__strong {
+    display: block;
+    color: var(--strong);
+}
+
+.table__sub {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.table a {
+    color: var(--strong);
+}
+
+.usage {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--strong);
+}
+
+/* Status: ■ ok in --strong, ▲ problem in --danger; always symbol and text. */
+.status {
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+}
+
+.status--ok {
+    color: var(--strong);
+}
+
+.status--problem {
+    color: var(--danger);
+}

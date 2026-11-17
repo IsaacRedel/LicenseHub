@@ -1,5 +1,152 @@
 @page "/"
+@inherits AdminPageBase
+@using System.Globalization
+@using LicenseHub.Admin.Components.Dashboard
+@using LicenseHub.Admin.Dashboard
+@inject AdminApiClient Api
+@inject DashboardClock Clock
 
 <PageTitle>Painel · LicenseHub</PageTitle>
 
-<PageHeader Crumb="LICENSEHUB / PAINEL" Title="PAINEL" />
+<PageHeader Crumb="LICENSEHUB / PAINEL" Title="PAINEL">
+    <button type="button" class="button-secondary" @onclick="LoadAsync" disabled="@_loading">ATUALIZAR</button>
+</PageHeader>
+
+@if (ApiError is not null)
+{
+    <p class="form-error" role="alert">@ApiError</p>
+}
+
+@if (_overview is null)
+{
+    <p class="label" role="status">@(_loading ? "CARREGANDO…" : string.Empty)</p>
+}
+else
+{
+    <div class="kpis">
+        <KpiCard Label="LICENÇAS ATIVAS" Value="_overview.Kpis.ActiveLicenses" Tone="primary" />
+        <KpiCard Label="VALIDAÇÕES HOJE" Value="_overview.Kpis.ValidationsToday" Tone="primary" />
+        <KpiCard Label="REVOGADAS" Value="_overview.Kpis.RevokedLicenses" Tone="danger" />
+        <KpiCard Label="EXPIRADAS" Value="_overview.Kpis.ExpiredLicenses" Tone="refused" />
+    </div>
+
+    <div class="row">
+        <Section Title="VALIDAÇÕES · ÚLTIMOS 30 DIAS" Class="row__chart">
+            <ValidationChart Days="_overview.Last30Days" />
+        </Section>
+        <div class="row__side">
+            <RankCard Result="_rank" />
+            <Section Title="MOTIVOS DE RECUSA · HOJE">
+                <RefusalReasons Today="_overview.Today" />
+            </Section>
+        </div>
+    </div>
+
+    <div class="row">
+        <Section Title="PRODUTOS" Class="row__products">
+            @if (_overview.Products.Count == 0)
+            {
+                <p class="empty">Nenhum produto cadastrado.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">PRODUTO</th>
+                                <th scope="col" class="table__num">ATIVAS</th>
+                                <th scope="col">USO DAS ATIVAÇÕES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var product in _overview.Products)
+                            {
+                                <tr>
+                                    <th scope="row">
+                                        <span class="table__strong">@product.Name</span>
+                                        <span class="table__sub">@product.Slug</span>
+                                    </th>
+                                    <td class="table__num">@product.ActiveLicenses.ToString("N0", PtBr)</td>
+                                    <td>
+                                        <span class="usage">@product.ActivationsUsed.ToString("N0", PtBr) / @product.ActivationCapacity.ToString("N0", PtBr)</span>
+                                        <ProgressBar Value="product.ActivationsUsed" Max="product.ActivationCapacity" Height="3" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </Section>
+
+        <Section Title="REGISTRO DE VALIDAÇÕES" Class="row__log">
+            @if (_log.Count == 0)
+            {
+                <p class="empty">Nenhuma validação registrada.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">HORÁRIO</th>
+                                <th scope="col">PRODUTO</th>
+                                <th scope="col">LICENÇA</th>
+                                <th scope="col">RESULTADO</th>
+                                <th scope="col">IP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in _log)
+                            {
+                                <tr>
+                                    <td>@Clock.Time(entry.CreatedAt)</td>
+                                    <td>@(entry.ProductSlug ?? "—")</td>
+                                    <td>
+                                        @if (entry.LicenseId is { } licenseId)
+                                        {
+                                            <a href="@($"/licencas/{licenseId}")">@Labels.ShortId(licenseId)</a>
+                                        }
+                                        else
+                                        {
+                                            <text>—</text>
+                                        }
+                                    </td>
+                                    <td><StatusBadge Ok="@(entry.Outcome == Labels.ValidOutcome)" Text="@Labels.Outcome(entry.Outcome)" /></td>
+                                    <td>@(entry.IpAddress ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </Section>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private StatsOverview? _overview;
+    private IReadOnlyList<ValidationLogEntry> _log = [];
+    private RankResult _rank = RankCalculator.Calculate(0, 0);
+    private bool _loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        await CallApiAsync(async () =>
+        {
+            var overview = Api.GetOverviewAsync(Clock.CurrentOffsetMinutes);
+            var log = Api.GetValidationsAsync(limit: 10);
+            _overview = await overview;
+            _log = await log;
+            _rank = RankCalculator.Calculate(_overview.Today.Accepted, _overview.Today.Total);
+        });
+        _loading = false;
+    }
+}

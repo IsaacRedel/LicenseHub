@@ -1,0 +1,26 @@
+@* Card: --panel background, 1px --line border and a 3px left border in the meaning's color. *@
+<article class="@($"kpi kpi--{Tone}")">
+    <p class="label kpi__label">@Label</p>
+    <p class="kpi__value">@Value.ToString("N0", Culture)</p>
+    @if (Hint is not null)
+    {
+        <p class="label kpi__hint">@Hint</p>
+    }
+</article>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public int Value { get; set; }
+
+    /// <summary>primary (active, validations), danger (revoked) or refused (expired).</summary>
+    [Parameter]
+    public string Tone { get; set; } = "primary";
+
+    [Parameter]
+    public string? Hint { get; set; }
+}
