@@ -1,0 +1,23 @@
+<div class="page-header">
+    <div>
+        <p class="label">@Crumb</p>
+        <h1 class="page-title">@Title</h1>
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="page-header__actions">@ChildContent</div>
+    }
+</div>
+
+@code {
+    /// <summary>Breadcrumb above the title, e.g. "LICENSEHUB / LICENÇAS".</summary>
+    [Parameter, EditorRequired]
+    public string Crumb { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Actions on the right of the title, such as the main button.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

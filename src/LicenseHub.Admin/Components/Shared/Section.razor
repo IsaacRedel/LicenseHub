@@ -1,0 +1,17 @@
+<section class="@($"section {Class}".Trim())" aria-labelledby="@_titleId">
+    <h2 class="section-title" id="@_titleId"><span aria-hidden="true">■ </span>@Title</h2>
+    @ChildContent
+</section>
+
+@code {
+    private readonly string _titleId = $"section-{Guid.NewGuid():N}"[..16];
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

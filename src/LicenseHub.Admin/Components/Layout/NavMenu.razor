@@ -1,0 +1,44 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+<nav class="nav" aria-label="Navegação principal">
+    <ul class="nav__list">
+        @foreach (var item in Items)
+        {
+            var active = IsActive(item);
+            <li>
+                <a href="@item.Href"
+                   class="@(active ? "nav__item nav__item--active" : "nav__item")"
+                   aria-current="@(active ? "page" : null)">
+                    <span class="nav__marker" aria-hidden="true"></span>
+                    @item.Label
+                </a>
+            </li>
+        }
+    </ul>
+</nav>
+
+@code {
+    internal sealed record NavItem(string Href, string Label, bool Exact = false);
+
+    internal static readonly NavItem[] Items =
+    [
+        new("/", "PAINEL", Exact: true),
+        new("/licencas", "LICENÇAS"),
+        new("/produtos", "PRODUTOS"),
+    ];
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private bool IsActive(NavItem item)
+    {
+        var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].TrimEnd('/');
+        return item.Exact
+            ? path == item.Href
+            : path == item.Href || path.StartsWith(item.Href + "/", StringComparison.Ordinal);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

@@ -1,17 +1,42 @@
 @inherits LayoutComponentBase
 
-<header class="topbar">
-    <ThemeToggle InitialTheme="@InitialTheme" />
-</header>
+<div class="shell">
+    <aside class="sidebar">
+        <a class="brand" href="/">
+            <span class="brand__name">LICENSEHUB</span>
+            <span class="label">PAINEL DE ADMIN</span>
+        </a>
 
-<main class="content">
-    @Body
-</main>
+        <NavMenu />
 
-<form method="post" action="/logout" class="logout-form">
-    <AntiforgeryToken />
-    <button type="submit" class="logout-button">SAIR</button>
-</form>
+        <div class="sidebar__footer">
+            <AuthorizeView>
+                <p class="label sidebar__user" title="@context.User.Identity?.Name">@context.User.Identity?.Name</p>
+            </AuthorizeView>
+            <form method="post" action="/logout" class="logout-form">
+                <AntiforgeryToken />
+                <button type="submit" class="nav__item logout-button">
+                    <span class="nav__marker" aria-hidden="true"></span>
+                    SAIR
+                </button>
+            </form>
+        </div>
+
+        <SpiderWeb />
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <ThemeToggle InitialTheme="@InitialTheme" />
+        </header>
+
+        <main class="content">
+            @Body
+        </main>
+    </div>
+
+    <div class="scanlines" aria-hidden="true"></div>
+</div>
 
 @code {
     [CascadingParameter(Name = "InitialTheme")]

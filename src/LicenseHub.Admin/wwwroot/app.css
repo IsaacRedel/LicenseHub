@@ -52,6 +52,11 @@ textarea:focus-visible,
     outline-offset: 2px;
 }
 
+/* FocusOnNavigate moves focus to the page title for screen readers; it is not clickable, so no outline. */
+h1[tabindex="-1"]:focus {
+    outline: none;
+}
+
 .visually-hidden {
     position: absolute !important;
     width: 1px;
@@ -64,11 +69,238 @@ textarea:focus-visible,
     border: 0;
 }
 
+/* ---------- Typography ---------- */
+
+.page-title {
+    margin: 0;
+    font-family: var(--font-head);
+    font-size: 40px;
+    font-weight: var(--head-weight);
+    letter-spacing: var(--head-spacing);
+    line-height: 1.1;
+    text-transform: uppercase;
+    color: var(--strong);
+}
+
+.section-title {
+    margin: 0 0 16px;
+    font-family: var(--font-head);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--strong);
+}
+
+.label {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* ---------- Layout: 232px sidebar and content, wrapping on small screens ---------- */
+
+.shell {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 100vh;
+}
+
+.sidebar {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    flex: 0 0 232px;
+    width: 232px;
+    padding: 28px 0 24px;
+    overflow: hidden;
+    background-color: var(--side);
+    border-right: 1px solid var(--line);
+}
+
+.main {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    padding: 36px 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
 .topbar {
     display: flex;
     justify-content: flex-end;
     align-items: center;
     gap: 16px;
+    padding: 20px 44px 0;
+}
+
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.page-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+@media (max-width: 720px) {
+    .sidebar {
+        flex: 1 1 100%;
+        width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        padding: 20px 0 16px;
+        gap: 16px;
+    }
+
+    .main {
+        flex: 1 1 100%;
+    }
+
+    .content {
+        padding: 24px 16px;
+    }
+
+    .topbar {
+        padding: 16px 16px 0;
+    }
+
+    .page-title {
+        font-size: 30px;
+    }
+
+    .web {
+        width: 120px;
+        height: 120px;
+        right: -24px;
+        bottom: -24px;
+    }
+}
+
+/* ---------- Sidebar ---------- */
+
+.brand {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 24px;
+    text-decoration: none;
+}
+
+.brand__name {
+    font-family: var(--font-head);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    color: var(--strong);
+}
+
+.nav__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.nav__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 24px;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-head);
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    text-align: left;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.nav__item:hover {
+    color: var(--strong);
+}
+
+.nav__marker {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--muted);
+}
+
+.nav__item--active {
+    background-color: var(--primary);
+    color: var(--on-primary);
+}
+
+.nav__item--active:hover {
+    color: var(--on-primary);
+}
+
+.nav__item--active .nav__marker {
+    border-color: var(--on-primary);
+    background-color: var(--on-primary);
+}
+
+.sidebar__footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebar__user {
+    padding: 0 24px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.logout-form {
+    margin: 0;
+}
+
+/* Decorative web, cut by the sidebar border. */
+.web {
+    position: absolute;
+    right: -40px;
+    bottom: -40px;
+    color: var(--web);
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+/* Scanlines over the page; visible only where --scanlines is 1 (Tático). */
+.scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--scanlines);
+    background-image: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 2px,
+        rgba(0, 0, 0, 0.18) 3px,
+        transparent 4px);
+    z-index: 10;
 }
 
 /* Theme switch: half-circle icon and TEMA: label. */
