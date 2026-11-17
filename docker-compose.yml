@@ -49,7 +49,8 @@ services:
     depends_on:
       - api
     environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      # The panel has no development-only behavior; Production keeps exception details out of its pages.
+      ASPNETCORE_ENVIRONMENT: Production
       # Internal compose network; the API is not reached through the host.
       LicenseHub__ApiBaseUrl: http://api:8080
       DataProtection__KeysPath: /keys
