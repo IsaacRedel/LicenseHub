@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/LicenseHub.Admin/LicenseHub.Admin.csproj" />
     <Project Path="src/LicenseHub.Api/LicenseHub.Api.csproj" />
     <Project Path="src/LicenseHub.Application/LicenseHub.Application.csproj" />
     <Project Path="src/LicenseHub.Domain/LicenseHub.Domain.csproj" />

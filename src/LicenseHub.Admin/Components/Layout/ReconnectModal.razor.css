@@ -1,0 +1,61 @@
+/* Visibility per reconnection state; the classes are set by blazor.web.js. */
+.components-reconnect-first-attempt-visible,
+.components-reconnect-repeated-attempt-visible,
+.components-reconnect-failed-visible,
+.components-pause-visible,
+.components-resume-failed-visible {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-show .components-reconnect-first-attempt-visible,
+#components-reconnect-modal.components-reconnect-paused .components-pause-visible,
+#components-reconnect-modal.components-reconnect-resume-failed .components-resume-failed-visible,
+#components-reconnect-modal.components-reconnect-retrying,
+#components-reconnect-modal.components-reconnect-retrying .components-reconnect-repeated-attempt-visible,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-failed .components-reconnect-failed-visible {
+    display: block;
+}
+
+/* Straight corners, 1px borders, no shadow or gradient (DESIGN.md). */
+#components-reconnect-modal {
+    width: min(22rem, calc(100vw - 32px));
+    margin: 20vh auto;
+    padding: 22px 24px;
+    border: 1px solid var(--line);
+    background-color: var(--panel);
+    color: var(--ink);
+    font-family: var(--font-head);
+}
+
+#components-reconnect-modal::backdrop {
+    background-color: var(--bg);
+    opacity: 0.85;
+}
+
+.components-reconnect-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+#components-reconnect-modal p {
+    margin: 0;
+    text-align: center;
+}
+
+#components-reconnect-modal button {
+    min-height: 44px;
+    padding: 0 20px;
+    border: 1px solid var(--primary);
+    background: transparent;
+    color: var(--strong);
+    font-family: var(--font-mono);
+    cursor: pointer;
+}
+
+#components-reconnect-modal button:focus-visible {
+    outline: 2px solid var(--strong);
+    outline-offset: 2px;
+}

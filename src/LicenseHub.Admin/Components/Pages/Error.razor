@@ -1,0 +1,22 @@
+@page "/erro"
+@using System.Diagnostics
+
+<PageTitle>Erro · LicenseHub</PageTitle>
+
+<h1 class="page-title">ERRO</h1>
+<p>Ocorreu um erro ao processar sua solicitação.</p>
+
+@if (!string.IsNullOrEmpty(RequestId))
+{
+    <p class="label">ID DA SOLICITAÇÃO: <code>@RequestId</code></p>
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

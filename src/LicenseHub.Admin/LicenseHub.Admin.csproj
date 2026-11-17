@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- Local settings for `dotnet run` (API URL, keys path); never committed. -->
+    <UserSecretsId>licensehub-admin-3c9b1e72</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LicenseHub.Admin.Tests" />
+  </ItemGroup>
+
+</Project>
