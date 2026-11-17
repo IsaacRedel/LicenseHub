@@ -14,6 +14,10 @@
             <p class="label">CHAVE DA LICENÇA</p>
             <output class="issued__key" id="issued-key">@_issued.Key</output>
             <p class="issued__warning" role="alert"><span aria-hidden="true">▲ </span>Guarde esta chave agora. Ela não será exibida de novo.</p>
+            @if (_error is not null)
+            {
+                <p class="form-error" role="alert">@_error</p>
+            }
             <div class="modal__actions">
                 <button type="button" class="button-secondary" @onclick="CopyAsync">@(_copied ? "COPIADA" : "COPIAR")</button>
                 <button type="button" class="button-primary" @onclick="CloseAsync">FECHAR</button>
@@ -108,6 +112,12 @@
 
     private async Task IssueAsync()
     {
+        // The disabled button reaches the browser only after a round trip: a double click must not issue twice.
+        if (_saving)
+        {
+            return;
+        }
+
         _saving = true;
         _error = null;
 
@@ -140,8 +150,16 @@
             return;
         }
 
-        await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/clipboard.js");
-        _copied = await module.InvokeAsync<bool>("copy", _issued.Key);
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/clipboard.js");
+            _copied = await module.InvokeAsync<bool>("copy", _issued.Key);
+        }
+        catch (JSException)
+        {
+            _copied = false;
+        }
+
         if (!_copied)
         {
             _error = "Não foi possível copiar. Selecione a chave e copie manualmente.";
@@ -175,11 +193,11 @@
         {
             await call();
         }
-        catch (SessionExpiredException)
+        catch (SessionExpiredException ex)
         {
-            Navigation.NavigateTo(AdminAuthentication.SessionExpiredPath, forceLoad: true);
+            Navigation.NavigateTo(AdminAuthentication.SessionExpiredUrl(ex.Session), forceLoad: true);
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (AdminPageBase.IsApiFailure(ex))
         {
             _error = AdminPageBase.ApiErrorMessage;
         }

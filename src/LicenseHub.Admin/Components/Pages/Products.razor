@@ -109,6 +109,12 @@
 
     private async Task CreateAsync()
     {
+        // A double click must not submit twice (the disabled button needs a round trip).
+        if (_saving)
+        {
+            return;
+        }
+
         _saving = true;
         _formError = null;
         _created = null;

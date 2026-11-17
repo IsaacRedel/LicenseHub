@@ -4,8 +4,14 @@ using LicenseHub.Admin.Auth;
 
 namespace LicenseHub.Admin.Api;
 
-/// <summary>The API rejected the admin token (expired, revoked admin or rotated key): the panel session must end.</summary>
-public sealed class SessionExpiredException() : Exception("The admin session expired.");
+/// <summary>
+/// The API rejected the admin token (expired, revoked admin or rotated key), or the session was logged out: the panel
+/// session must end. <see cref="Session"/> is the circuit's <see cref="TokenProvider.SessionId"/>, if it had a token.
+/// </summary>
+public sealed class SessionExpiredException(string? session) : Exception("The admin session expired.")
+{
+    public string? Session { get; } = session;
+}
 
 /// <summary>
 /// Adds "Authorization: Bearer" to every call of <see cref="AdminApiClient"/> with the token of the current circuit,
@@ -18,7 +24,7 @@ public sealed class BearerTokenHandler(CircuitServicesAccessor circuitServices) 
         var tokens = circuitServices.Services?.GetService<TokenProvider>();
         if (tokens?.AccessToken is not { } token)
         {
-            throw new SessionExpiredException();
+            throw new SessionExpiredException(tokens?.Session);
         }
 
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -28,7 +34,7 @@ public sealed class BearerTokenHandler(CircuitServicesAccessor circuitServices) 
         {
             response.Dispose();
             tokens.MarkExpired();
-            throw new SessionExpiredException();
+            throw new SessionExpiredException(tokens.Session);
         }
 
         return response;

@@ -17,6 +17,11 @@
 <body>
     <Routes @rendermode="PageRenderMode" InitialTheme="@_theme" />
     <ReconnectModal />
+    @* Shown by blazor.web.js when the circuit fails with an unhandled error, instead of a frozen page. *@
+    <div id="blazor-error-ui" role="alert">
+        Ocorreu um erro inesperado no painel.
+        <a href="." class="reload">RECARREGAR</a>
+    </div>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 

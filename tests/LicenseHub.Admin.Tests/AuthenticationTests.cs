@@ -100,7 +100,7 @@ public sealed class AuthenticationTests : IDisposable
         await LogInAsync(browser);
 
         // What the panel does when the API answers 401: go to /sessao-expirada, which posts the logout form.
-        var expiredPage = await browser.GetStringAsync("/sessao-expirada", Token);
+        var expiredPage = await browser.GetStringAsync(ExpiredPathFor(_factory.Api.IssuedToken!), Token);
         Assert.Contains("action=\"/logout\"", expiredPage, StringComparison.Ordinal);
         Assert.Contains("js/session-expired.js", expiredPage, StringComparison.Ordinal);
 
@@ -131,6 +131,85 @@ public sealed class AuthenticationTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, logout.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/", Token)).StatusCode);
     }
+
+    [Theory]
+    [InlineData("/sessao-expirada?sessao=AAAAAAAAAAAAAAAA")]
+    [InlineData("/sessao-expirada")]
+    public async Task SessionExpired_OfAnotherSession_KeepsTheCurrentLogin(string path)
+    {
+        // A 401 in an old tab after a newer login in another tab, or a link from another site.
+        _factory.Api.AcceptLogin();
+        using var browser = _factory.CreateBrowser();
+        await LogInAsync(browser);
+
+        var response = await browser.GetAsync(path, Token);
+
+        AssertRedirectsHome(response);
+        Assert.False(response.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("lh-admin=", StringComparison.Ordinal)));
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/", Token)).StatusCode);
+    }
+
+    [Fact]
+    public async Task SessionExpired_WithoutASession_GoesStraightToTheNotice()
+    {
+        using var browser = _factory.CreateBrowser();
+
+        var response = await browser.GetAsync("/sessao-expirada?sessao=AAAAAAAAAAAAAAAA", Token);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var location = new Uri(new Uri("https://localhost"), response.Headers.Location!);
+        Assert.Equal("/login?expirada=1", location.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task Logout_RefusesTheSameCookieAfterwards()
+    {
+        _factory.Api.AcceptLogin();
+        using var browser = _factory.CreateBrowser();
+        var login = await LogInAsync(browser);
+        var sessionCookie = Assert.Single(login.Headers.GetValues("Set-Cookie"), c => c.StartsWith("lh-admin=", StringComparison.Ordinal)).Split(';')[0];
+
+        var page = await browser.GetStringAsync(ExpiredPathFor(_factory.Api.IssuedToken!), Token);
+        var logout = await browser.PostAsync("/logout", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = AdminPanelFactory.AntiforgeryToken(page),
+        }), Token);
+        Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
+
+        // Someone who copied the cookie before the logout presents it again.
+        using var replay = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+        });
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/");
+        request.Headers.Add("Cookie", sessionCookie);
+        var response = await replay.SendAsync(request, Token);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("https://localhost/login", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("unreadable")]
+    public async Task Login_ShowsTheApiErrorWhenTheApiTimesOutOrAnswersGarbage(string failure)
+    {
+        _factory.Api.On(HttpMethod.Post, "/admin/auth/login", _ => failure == "timeout"
+            ? throw new TaskCanceledException("The request timed out.")
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("not json", System.Text.Encoding.UTF8, "application/json") });
+        using var browser = _factory.CreateBrowser();
+
+        var response = await LogInAsync(browser);
+        var html = System.Net.WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync(Token));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(LicenseHub.Admin.Components.Shared.AdminPageBase.ApiErrorMessage, html, StringComparison.Ordinal);
+    }
+
+    private static string ExpiredPathFor(string accessToken) =>
+        LicenseHub.Admin.Auth.AdminAuthentication.SessionExpiredUrl(LicenseHub.Admin.Auth.TokenProvider.SessionId(accessToken));
 
     /// <summary>The panel redirects with an absolute URL; it must stay on the panel and land on the dashboard.</summary>
     private static void AssertRedirectsHome(HttpResponseMessage response)

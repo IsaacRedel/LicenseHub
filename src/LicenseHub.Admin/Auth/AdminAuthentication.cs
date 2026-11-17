@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.DataProtection;
-
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace LicenseHub.Admin.Auth;
@@ -44,11 +44,25 @@ public static class AdminAuthentication
                 // The session lasts exactly as long as the API token: no sliding renewal past its expiry.
                 options.SlidingExpiration = false;
                 options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+
+                // A logged-out session is refused even if its cookie is presented again (see SessionRegistry).
+                options.Events.OnValidatePrincipal = async context =>
+                {
+                    var token = context.Principal?.FindFirst(AdminClaims.AccessToken)?.Value;
+                    var sessions = context.HttpContext.RequestServices.GetRequiredService<SessionRegistry>();
+                    if (token is null || sessions.IsEnded(TokenProvider.SessionId(token)))
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    }
+                };
             });
 
         services.AddAuthorization();
         services.AddCascadingAuthenticationState();
 
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<SessionRegistry>();
         services.AddScoped<TokenProvider>();
         services.AddSingleton<CircuitServicesAccessor>();
         services.AddScoped<CircuitHandler, ServicesAccessorCircuitHandler>();
@@ -65,6 +79,13 @@ public static class AdminAuthentication
 
         return services;
     }
+
+    /// <summary>
+    /// Where a page goes when its session ends: /sessao-expirada logs out only if the cookie still holds this
+    /// circuit's session, so a 401 in an old tab does not end a newer login made in another tab.
+    /// </summary>
+    public static string SessionExpiredUrl(string? session) =>
+        session is null ? SessionExpiredPath : $"{SessionExpiredPath}?sessao={Uri.EscapeDataString(session)}";
 
     /// <summary>Signs the admin in with a cookie that carries the API token and expires with it.</summary>
     public static Task SignInAsync(HttpContext httpContext, string accessToken, DateTimeOffset expiresAt)
@@ -93,11 +114,11 @@ public static class AdminAuthentication
 
     /// <summary>
     /// POST /logout, protected by the antiforgery token of the form that posts it. Validated explicitly so a missing
-    /// or wrong token answers 400 instead of failing while the form is read.
+    /// or wrong token answers 400 instead of failing while the form is read. Ends the session in every tab.
     /// </summary>
     public static IEndpointRouteBuilder MapAdminLogout(this IEndpointRouteBuilder app)
     {
-        app.MapPost(LogoutPath, async (HttpContext httpContext, IAntiforgery antiforgery) =>
+        app.MapPost(LogoutPath, async (HttpContext httpContext, IAntiforgery antiforgery, SessionRegistry sessions, TimeProvider time) =>
             {
                 if (!await antiforgery.IsRequestValidAsync(httpContext))
                 {
@@ -105,6 +126,12 @@ public static class AdminAuthentication
                 }
 
                 var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted);
+                var current = await httpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                if (current.Succeeded && current.Principal.FindFirst(AdminClaims.AccessToken)?.Value is { } token)
+                {
+                    sessions.End(TokenProvider.SessionId(token), current.Properties.ExpiresUtc ?? time.GetUtcNow().AddMinutes(30));
+                }
+
                 await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 return Results.LocalRedirect(form["reason"] == "expired" ? $"{LoginPath}?expirada=1" : LoginPath);
             })

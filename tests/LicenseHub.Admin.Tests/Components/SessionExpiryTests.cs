@@ -52,7 +52,7 @@ public sealed class SessionExpiryTests : BunitContext
             Render<Products>();
         }
 
-        Assert.EndsWith("/sessao-expirada", navigation.Uri, StringComparison.Ordinal);
+        Assert.EndsWith($"/sessao-expirada?sessao={TokenProvider.SessionId("an-admin-jwt")}", navigation.Uri, StringComparison.Ordinal);
         Assert.True(_tokens.IsExpired);
         Assert.Null(_tokens.AccessToken);
         Assert.All(_api.Requests, r => Assert.Equal("an-admin-jwt", r.Headers.Authorization?.Parameter));

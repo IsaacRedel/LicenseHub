@@ -44,16 +44,18 @@ public sealed partial class LoginApiClient(HttpClient http, ILogger<LoginApiClie
             LogApiUnreachable(ex.Message);
             return new LoginResult(LoginOutcome.ApiUnavailable);
         }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            LogApiUnreachable("timeout");
+            return new LoginResult(LoginOutcome.ApiUnavailable);
+        }
 
         using (response)
         {
             switch (response.StatusCode)
             {
                 case HttpStatusCode.OK:
-                    var body = await response.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken);
-                    return body is { AccessToken.Length: > 0 }
-                        ? new LoginResult(LoginOutcome.Success, body.AccessToken, body.ExpiresAt)
-                        : new LoginResult(LoginOutcome.ApiUnavailable);
+                    return await ReadTokenAsync(response, cancellationToken);
                 case HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest:
                     return new LoginResult(LoginOutcome.InvalidCredentials);
                 case HttpStatusCode.TooManyRequests:
@@ -65,6 +67,25 @@ public sealed partial class LoginApiClient(HttpClient http, ILogger<LoginApiClie
         }
     }
 
+    private async Task<LoginResult> ReadTokenAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        LoginResponse? body;
+        try
+        {
+            body = await response.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken);
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+        {
+            // The type only: the body would hold the token.
+            LogUnreadableResponse(ex.GetType().Name);
+            return new LoginResult(LoginOutcome.ApiUnavailable);
+        }
+
+        return body is { AccessToken.Length: > 0 }
+            ? new LoginResult(LoginOutcome.Success, body.AccessToken, body.ExpiresAt)
+            : new LoginResult(LoginOutcome.ApiUnavailable);
+    }
+
     private sealed record LoginResponse(string AccessToken, string TokenType, DateTimeOffset ExpiresAt);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Admin login: the API is unreachable ({Reason}).")]
@@ -72,4 +93,7 @@ public sealed partial class LoginApiClient(HttpClient http, ILogger<LoginApiClie
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Admin login: unexpected API status {Status}.")]
     private partial void LogUnexpectedStatus(int status);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Admin login: unreadable API response ({ErrorType}).")]
+    private partial void LogUnreadableResponse(string errorType);
 }

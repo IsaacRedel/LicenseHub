@@ -148,6 +148,7 @@ else
         {
             var overview = Api.GetOverviewAsync(Clock.CurrentOffsetMinutes);
             var log = Api.GetValidationsAsync(limit: 10);
+            await Task.WhenAll(overview, log);
             _overview = await overview;
             _log = await log;
             _rank = RankCalculator.Calculate(_overview.Today.Accepted, _overview.Today.Total);

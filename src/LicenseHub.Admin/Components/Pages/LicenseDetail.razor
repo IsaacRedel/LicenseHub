@@ -158,6 +158,7 @@ else
         {
             var license = Api.GetLicenseAsync(Id);
             var history = Api.GetValidationsAsync(HistoryLimit, Id);
+            await Task.WhenAll(license, history);
             _license = await license;
             _history = await history;
             _notFound = _license is null;
@@ -166,6 +167,12 @@ else
 
     private async Task RevokeAsync(string reason)
     {
+        // A double click must not send the revocation twice (the disabled button needs a round trip).
+        if (_saving)
+        {
+            return;
+        }
+
         _saving = true;
         _revokeError = null;
 

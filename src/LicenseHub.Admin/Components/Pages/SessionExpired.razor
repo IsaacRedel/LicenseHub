@@ -2,20 +2,56 @@
 @layout LoginLayout
 @attribute [AllowAnonymous]
 @attribute [ExcludeFromInteractiveRouting]
+@using LicenseHub.Admin.Auth
+@inject NavigationManager Navigation
 
 <PageTitle>Sessão expirada · LicenseHub</PageTitle>
 
-@* Ends the session with POST /logout (antiforgery), then /login shows "Sessão expirada".
-   js/session-expired.js submits the form at once; without JavaScript the button does it. *@
-<section class="login" aria-labelledby="expired-title">
-    <p class="label">LICENSEHUB · PAINEL DE ADMIN</p>
-    <h1 id="expired-title" class="page-title">SESSÃO EXPIRADA</h1>
-    <form id="session-expired-form" method="post" action="/logout" class="form">
-        <AntiforgeryToken />
-        <input type="hidden" name="reason" value="expired" />
-        <p>Sua sessão terminou. Entre de novo para continuar.</p>
-        <button type="submit" class="button-primary">ENTRAR DE NOVO</button>
-    </form>
-</section>
+@if (_endSession)
+{
+    @* Ends the session with POST /logout (antiforgery), then /login shows "Sessão expirada".
+       js/session-expired.js submits the form at once; without JavaScript the button does it. *@
+    <section class="login" aria-labelledby="expired-title">
+        <p class="label">LICENSEHUB · PAINEL DE ADMIN</p>
+        <h1 id="expired-title" class="page-title">SESSÃO EXPIRADA</h1>
+        <form id="session-expired-form" method="post" action="/logout" class="form">
+            <AntiforgeryToken />
+            <input type="hidden" name="reason" value="expired" />
+            <p>Sua sessão terminou. Entre de novo para continuar.</p>
+            <button type="submit" class="button-primary">ENTRAR DE NOVO</button>
+        </form>
+    </section>
 
-<script src="js/session-expired.js"></script>
+    <script src="js/session-expired.js"></script>
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    /// <summary>The session that ended, from <see cref="AdminAuthentication.SessionExpiredUrl"/>.</summary>
+    [SupplyParameterFromQuery(Name = "sessao")]
+    private string? Session { get; set; }
+
+    private bool _endSession;
+
+    protected override void OnInitialized()
+    {
+        var token = HttpContext.User.FindFirst(AdminClaims.AccessToken)?.Value;
+        if (token is null)
+        {
+            // The cookie already expired or was logged out: nothing to clear.
+            Navigation.NavigateTo($"{AdminAuthentication.LoginPath}?expirada=1");
+        }
+        else if (Session is null || !string.Equals(TokenProvider.SessionId(token), Session, StringComparison.Ordinal))
+        {
+            // The cookie holds another session (a newer login in another tab) or the link came from elsewhere:
+            // keep it, and reload the panel with it.
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            _endSession = true;
+        }
+    }
+}
