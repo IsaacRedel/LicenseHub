@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using LicenseHub.Application.Abstractions;
 using LicenseHub.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -21,6 +22,7 @@ public static class AdminAuthentication
                 // Keep the JWT claim names (sub, email) instead of the legacy SOAP claim URIs.
                 options.MapInboundClaims = false;
                 options.TokenValidationParameters = settings.CreateValidationParameters();
+                options.Events = new JwtBearerEvents { OnTokenValidated = RejectRemovedAdminsAsync };
             });
 
         services.AddAuthorizationBuilder()
@@ -30,6 +32,22 @@ public static class AdminAuthentication
                 .RequireClaim(JwtRegisteredClaimNames.Sub));
 
         return services;
+    }
+
+    /// <summary>
+    /// A valid signature is not enough: the admin must still exist, so removing an admin cuts access at once
+    /// instead of when the token expires. One primary-key lookup per admin request.
+    /// </summary>
+    private static async Task RejectRemovedAdminsAsync(TokenValidatedContext context)
+    {
+        var sub = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        var admins = context.HttpContext.RequestServices.GetRequiredService<IAdminUserRepository>();
+
+        if (!Guid.TryParse(sub, out var adminId)
+            || await admins.GetByIdAsync(adminId, context.HttpContext.RequestAborted) is null)
+        {
+            context.Fail("The admin of this token no longer exists.");
+        }
     }
 
     /// <summary>The id of the authenticated admin, from the token's sub claim.</summary>

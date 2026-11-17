@@ -37,9 +37,14 @@ public static class AdminEndpoints
 
     private static async Task<IResult> LoginAsync(
         AdminLoginRequest request,
+        HttpContext httpContext,
         LoginHandler handler,
         CancellationToken cancellationToken)
     {
+        // The response carries a bearer token: no cache may keep it (RFC 6749, section 5.1).
+        httpContext.Response.Headers.CacheControl = "no-store";
+        httpContext.Response.Headers.Pragma = "no-cache";
+
         var result = await handler.HandleAsync(new LoginCommand(request.Email, request.Password), cancellationToken);
 
         return result.IsSuccess

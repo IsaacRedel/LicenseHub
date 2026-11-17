@@ -1,9 +1,11 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using LicenseHub.Domain.Admins;
 using LicenseHub.Infrastructure.Auth;
 using LicenseHub.IntegrationTests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -61,6 +63,7 @@ public sealed class AdminAuthTests(MariaDbFixture database) : ApiTestBase(databa
         var login = await LoginAsync(email.ToUpperInvariant(), AdminPassword);
 
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        Assert.True(login.Headers.CacheControl?.NoStore, "The token response must not be cached.");
         using var body = JsonDocument.Parse(await login.Content.ReadAsStringAsync(Token));
         Assert.Equal("Bearer", body.RootElement.GetProperty("tokenType").GetString());
         var expiresAt = body.RootElement.GetProperty("expiresAt").GetDateTimeOffset();
@@ -68,6 +71,21 @@ public sealed class AdminAuthTests(MariaDbFixture database) : ApiTestBase(databa
 
         var products = await GetWithTokenAsync("/admin/products", body.RootElement.GetProperty("accessToken").GetString()!);
         Assert.Equal(HttpStatusCode.OK, products.StatusCode);
+    }
+
+    [Fact]
+    public async Task Token_StopsWorkingOnceTheAdminIsRemoved()
+    {
+        using var admin = await CreateAdminClientAsync();
+        var license = await IssueLicenseAsync(maxActivations: 1);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/admin/products", Token)).StatusCode);
+
+        await QueryAsync(db => db.AdminUsers.ExecuteDeleteAsync(Token));
+
+        var list = await admin.GetAsync("/admin/products", Token);
+        var revoke = await admin.PostAsJsonAsync($"/admin/licenses/{license.Id}/revoke", new { reason = "Chargeback" }, Token);
+        Assert.Equal(HttpStatusCode.Unauthorized, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, revoke.StatusCode);
     }
 
     [Fact]
