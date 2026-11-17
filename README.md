@@ -181,7 +181,7 @@ O painel (`src/LicenseHub.Admin`) é um Blazor Web App que conversa só com a AP
 | **Produtos** | lista e cadastro |
 | **+ EMITIR LICENÇA** | mostra a chave uma única vez, com botão de copiar; ao fechar o diálogo, a chave é descartada |
 
-O "hoje" e os horários seguem o fuso de `Dashboard:TimeZone` (`DASHBOARD_TIMEZONE` no `.env`, padrão `America/Sao_Paulo`).
+O "hoje" e os horários seguem o fuso de `Dashboard:TimeZone` (`DASHBOARD_TIMEZONE` no `.env`, padrão `America/Sao_Paulo`). Em fusos com horário de verão, o gráfico de 30 dias usa o deslocamento de hoje para todos os dias, então validações perto da meia-noite de dias anteriores à mudança de horário podem cair no dia vizinho.
 
 ### Temas
 
@@ -194,11 +194,13 @@ O botão no topo troca o tema, e a escolha fica salva no navegador por um ano. S
 ### Sessão e segurança
 
 - **O navegador nunca recebe o JWT.** O painel faz o login na API e guarda o token dentro do próprio cookie (`lh-admin`), criptografado pelo Data Protection. O cookie é HttpOnly, Secure e SameSite=Strict, e expira junto com o token (30 minutos, sem renovação).
-- **Sessão expirada:** quando o token vence ou a API responde `401`, o painel encerra a sessão e volta ao login com o aviso "Sessão expirada".
-- **HTTPS:** o cookie é Secure, e os navegadores só o aceitam sem HTTPS em `127.0.0.1` e `localhost`. Para expor o painel em outro endereço, coloque-o atrás de um proxy reverso com HTTPS.
+- **Sessão expirada:** quando o token vence ou a API responde `401`, o painel encerra a sessão e volta ao login com o aviso "Sessão expirada". Uma aba antiga não derruba um login mais novo feito em outra aba.
+- **SAIR:** encerra a sessão em todas as abas abertas. O mesmo cookie, se alguém o tiver copiado, passa a ser recusado. Esse registro fica na memória do painel: depois de um reinício, um cookie copiado volta a valer até o token expirar.
+- **HTTPS:** o cookie é Secure, e os navegadores só o aceitam sem HTTPS em `127.0.0.1` e `localhost`. Para expor o painel em outro endereço, coloque-o atrás de um proxy reverso com HTTPS e liste o proxy em `ForwardedHeaders:KnownProxies` (ou `KnownNetworks`) do painel. Sem isso, todos os admins aparecem com o IP do proxy e dividem o mesmo limite de login.
 - **Chaves do Data Protection:** ficam no volume `admin-keys` (montado em `/keys`), então reiniciar o painel não derruba as sessões. O log avisa que essas chaves não são criptografadas em repouso; o volume deve ficar acessível só ao painel.
 - **Cabeçalhos:** CSP sem exceções (só scripts, estilos e fontes do próprio painel, sem nada inline), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` e `Permissions-Policy` bloqueando câmera, microfone e geolocalização.
-- **Rate limit do login:** o painel repassa à API o IP do navegador. A API só confia nesse cabeçalho quando ele vem do endereço fixo do painel na rede do compose (`172.30.89.10`), então o limite de 5 tentativas por minuto continua valendo por pessoa.
+- **Rate limit do login:** o painel repassa à API o IP de quem acessa o painel. A API só confia nesse cabeçalho quando ele vem do endereço fixo do painel na rede do compose (`172.30.89.10`), então o limite de 5 tentativas por minuto vale por IP de quem acessa, não para o painel inteiro.
+- **Erros:** o container do painel roda em `Production`, sem detalhes de exceção nas páginas. Se a API cair ou demorar, as telas mostram um aviso em vez de travar.
 - **Logs:** o painel nunca registra chaves de licença nem tokens.
 
 ### Rodar sem Docker

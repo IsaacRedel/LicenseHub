@@ -73,14 +73,16 @@ LicenseHub/
    - O login é uma página renderizada no servidor, com formulário e antiforgery. O painel chama a API e guarda o JWT como claim dentro do próprio cookie, criptografado pelo Data Protection.
    - O cookie é HttpOnly, Secure e SameSite=Strict e expira junto com o JWT, sem renovação. As chaves do Data Protection ficam num volume, para a sessão sobreviver a um reinício.
    - As telas usam Interactive Server com prerender desligado. Um `CircuitHandler` lê o token do usuário quando o circuito abre, e um `DelegatingHandler` o envia como `Bearer`, acessando os serviços do circuito pelo padrão `CircuitServicesAccessor` da documentação.
-   - Um `401` da API marca o token como expirado e leva a `/sessao-expirada`, que faz o `POST /logout` com antiforgery e volta ao login com "Sessão expirada".
+   - Um `401` da API marca o token como expirado e leva a `/sessao-expirada?sessao=<id>`, que faz o `POST /logout` com antiforgery e volta ao login com "Sessão expirada". O `id` são 16 caracteres do SHA-256 do token. Se o cookie já for de outra sessão (um login mais novo em outra aba), a página só recarrega o painel.
+   - As rotas interativas usam `AuthorizeRouteView`, então o `[Authorize]` vale também na navegação dentro do circuito.
+   - Um registro em memória liga cada sessão aos circuitos abertos. O logout tira o token de todas as abas e recusa o mesmo cookie até ele expirar. Ele é local a uma instância do painel e se perde num reinício.
    - O painel mostra "Muitas tentativas" quando a API responde `429`. O bloqueio da conta continua indistinguível de senha errada, como na decisão 7.
    - CSP sem exceções: o Blazor funcionou com `script-src 'self'` e `style-src 'self'`, sem scripts nem estilos inline. Por isso o painel não usa o `<ImportMap>` do template, e tamanhos dinâmicos ficam em atributos SVG.
 9. **Rate limit por admin e proxy confiável.**
    - Chamadas autenticadas em `/admin/*` são limitadas por admin (`sub` do token), não por IP. Assim, todos os admins atrás do painel não dividem a mesma cota.
-   - No login, o painel repassa o IP do navegador em `X-Forwarded-For`. A API só aceita esse cabeçalho do IP fixo do painel numa sub-rede fixa do compose, então o limite de login continua por pessoa.
+   - No login, o painel repassa o IP do navegador em `X-Forwarded-For`. A API só aceita esse cabeçalho do IP fixo do painel numa sub-rede fixa do compose, então o limite de login vale por IP de quem acessa o painel. Atrás de um proxy reverso, o painel usa as mesmas regras de `ForwardedHeaders` da API.
 10. **Dashboard calculado no banco, no fuso do painel.**
-    - `GET /admin/stats/overview` agrega no MariaDB os números do dia, os 30 dias, os motivos de recusa e o uso por produto. O dia do calendário segue `tzOffsetMinutes`, que o painel calcula a partir de `Dashboard:TimeZone` (padrão `America/Sao_Paulo`).
+    - `GET /admin/stats/overview` agrega no MariaDB os números do dia, os 30 dias, os motivos de recusa e o uso por produto. O dia do calendário segue `tzOffsetMinutes`, que o painel calcula a partir de `Dashboard:TimeZone` (padrão `America/Sao_Paulo`). Limite conhecido: um único deslocamento vale para os 30 dias, então, em fusos com horário de verão, dias anteriores à mudança ficam com uma hora de diferença. O padrão não tem horário de verão desde 2019.
     - `GET /admin/validations` devolve as últimas validações, também filtradas por licença no detalhe.
     - O rank do dia (D, C, B, A, S, SSS) é calculado no painel por uma classe pura, com os limites numa constante. Sem validações no dia, mostra "—".
     - O id curto exibido nas listas usa os 8 últimos dígitos do GUID. Os primeiros são o timestamp do GUID v7 e se repetiam entre licenças criadas no mesmo minuto.
